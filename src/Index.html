@@ -735,6 +735,14 @@
       pendingMemoRaw: null
     };
 
+    // ===== 無限ループ防止ガード =====
+    let __calendarLoading = false;
+    let __calendarRetry = 0;
+    let __memoLoading = false;
+    let __memoRetry = 0;
+    const MAX_RETRY = 3;
+    let __lastRenderKey = ''; // 同一月の再レンダー防止
+
     // ===== 初期化 =====
     document.addEventListener('DOMContentLoaded', init);
 
@@ -750,8 +758,8 @@
           state.memoDate = data.today;
 
           updateHeaderDate();
-          loadCalendarData();
-          loadMemoData();
+          loadCalendarDataSafe();
+          loadMemoDataSafe();
         })
         .withFailureHandler(handleError)
         .getInitialData();
@@ -819,14 +827,30 @@
     }
 
     // ===== カレンダー =====
-    function loadCalendarData() {
+    function loadCalendarDataSafe() {
+      if (__calendarLoading) return; // 二重起動防止
+      __calendarLoading = true;
+
       google.script.run
         .withSuccessHandler(function(data) {
+          __calendarLoading = false;
+          __calendarRetry = 0; // 成功でリトライリセット
           state.calendarData = data;
           renderCalendar();
           showLoading(false);
         })
-        .withFailureHandler(handleError)
+        .withFailureHandler(function(error) {
+          __calendarLoading = false;
+          console.error("loadCalendarData failed:", error);
+          __calendarRetry++;
+          if (__calendarRetry >= MAX_RETRY) {
+            showLoading(false);
+            showToast("読み込みに失敗しました。ページを再読み込みしてください。");
+            return;
+          }
+          // 少し待ってからリトライ
+          setTimeout(loadCalendarDataSafe, 800);
+        })
         .getCalendarData(state.currentYear, state.currentMonth);
     }
 
@@ -840,7 +864,7 @@
         state.currentYear--;
       }
       showLoading(true);
-      loadCalendarData();
+      loadCalendarDataSafe();
     }
 
     function renderCalendar() {
@@ -924,7 +948,7 @@
         state.selectedDate = dateStr;
         state.memoDate = dateStr;
         renderCalendar();
-        loadMemoData();
+        loadMemoDataSafe();
         switchTab('memo');
       });
 
@@ -932,14 +956,29 @@
     }
 
     // ===== メモ =====
-    function loadMemoData() {
+    function loadMemoDataSafe() {
+      if (__memoLoading) return; // 二重起動防止
+      __memoLoading = true;
+
       document.getElementById('memoDateDisplay').textContent = formatDateJP(state.memoDate);
 
       google.script.run
         .withSuccessHandler(function(data) {
+          __memoLoading = false;
+          __memoRetry = 0; // 成功でリトライリセット
           document.getElementById('memoText').value = data.text || '';
         })
-        .withFailureHandler(handleError)
+        .withFailureHandler(function(error) {
+          __memoLoading = false;
+          console.error("loadMemoData failed:", error);
+          __memoRetry++;
+          if (__memoRetry >= MAX_RETRY) {
+            showToast("メモ読み込みに失敗しました。");
+            return;
+          }
+          // 少し待ってからリトライ
+          setTimeout(loadMemoDataSafe, 800);
+        })
         .getMemoData(state.memoDate);
     }
 
@@ -947,7 +986,7 @@
       const d = new Date(state.memoDate);
       d.setDate(d.getDate() + delta);
       state.memoDate = formatDateISO(d);
-      loadMemoData();
+      loadMemoDataSafe();
     }
 
     function formatDateJP(dateStr) {
@@ -1076,7 +1115,7 @@
           if (result.success) {
             showToast(result.message);
             document.getElementById('calendarTextInput').value = '';
-            loadCalendarData();
+            loadCalendarDataSafe();
           } else {
             showToast('エラー: ' + result.error);
           }
@@ -1109,6 +1148,8 @@
     let isRecording = false;
     let currentRecordingType = null;
     let finalTextBuffer = '';  // 確定テキストを蓄積
+    let __speechRetry = 0;
+    const MAX_SPEECH_RETRY = 3;
 
     function toggleVoiceInput(type) {
       if (isRecording && currentRecordingType === type) {
@@ -1145,6 +1186,7 @@
       finalTextBuffer = '';
       isRecording = true;
       currentRecordingType = type;
+      __speechRetry = 0; // 開始時にリトライカウントリセット
 
       micBtn.classList.add('recording');
       micBtn.textContent = '⏹';
@@ -1175,10 +1217,22 @@
 
       recognition.onerror = function(event) {
         console.error('Voice error:', event.error);
+        __speechRetry++;
+
+        // 無限ループ防止：最大リトライ回数で停止
+        if (__speechRetry >= MAX_SPEECH_RETRY) {
+          if (event.error !== 'aborted' && event.error !== 'no-speech') {
+            showToast('音声認識エラー: ' + event.error);
+          }
+          resetVoiceUI(type);
+          return;
+        }
+
+        // aborted/no-speech以外のエラーは通知
         if (event.error !== 'aborted' && event.error !== 'no-speech') {
           showToast('音声認識エラー: ' + event.error);
+          resetVoiceUI(type);
         }
-        resetVoiceUI(type);
       };
 
       recognition.onend = function() {
