@@ -777,9 +777,15 @@
           <label class="modal-form-label">タイトル</label>
           <input type="text" class="modal-form-input" id="modalEventTitle" placeholder="予定のタイトル">
         </div>
-        <div class="modal-form-item">
-          <label class="modal-form-label">日付</label>
-          <input type="date" class="modal-form-input" id="modalEventDate">
+        <div class="modal-form-row">
+          <div class="modal-form-item" style="flex:1">
+            <label class="modal-form-label">開始日</label>
+            <input type="date" class="modal-form-input" id="modalEventStartDate">
+          </div>
+          <div class="modal-form-item" style="flex:1">
+            <label class="modal-form-label">終了日</label>
+            <input type="date" class="modal-form-input" id="modalEventEndDate">
+          </div>
         </div>
         <div class="modal-form-row">
           <div class="modal-form-item" style="flex:1">
@@ -839,9 +845,15 @@
           <label class="modal-form-label">タイトル</label>
           <input type="text" class="modal-form-input" id="editEventTitle" placeholder="予定のタイトル">
         </div>
-        <div class="modal-form-item">
-          <label class="modal-form-label">日付</label>
-          <input type="date" class="modal-form-input" id="editEventDate">
+        <div class="modal-form-row">
+          <div class="modal-form-item" style="flex:1">
+            <label class="modal-form-label">開始日</label>
+            <input type="date" class="modal-form-input" id="editEventStartDate">
+          </div>
+          <div class="modal-form-item" style="flex:1">
+            <label class="modal-form-label">終了日</label>
+            <input type="date" class="modal-form-input" id="editEventEndDate">
+          </div>
         </div>
         <div class="modal-form-row">
           <div class="modal-form-item" style="flex:1">
@@ -1414,7 +1426,10 @@
     function showCalendarModal(data) {
       // フォームにAI解析結果を初期値としてセット
       document.getElementById('modalEventTitle').value = data.title || '';
-      document.getElementById('modalEventDate').value = data.start_date || state.selectedDate || '';
+      const startDate = data.start_date || state.selectedDate || '';
+      const endDate = data.end_date || startDate; // end_dateがなければstart_dateと同じ
+      document.getElementById('modalEventStartDate').value = startDate;
+      document.getElementById('modalEventEndDate').value = endDate;
       document.getElementById('modalEventStartTime').value = data.start_time || '';
       document.getElementById('modalEventEndTime').value = data.end_time || '';
       document.getElementById('modalEventMemo').value = data.memo || '';
@@ -1558,7 +1573,8 @@
             const evt = result.event;
             document.getElementById('editEventId').value = evt.event_id;
             document.getElementById('editEventTitle').value = evt.title || '';
-            document.getElementById('editEventDate').value = evt.start_date || '';
+            document.getElementById('editEventStartDate').value = evt.start_date || '';
+            document.getElementById('editEventEndDate').value = evt.end_date || evt.start_date || '';
             document.getElementById('editEventStartTime').value = evt.start_time || '';
             document.getElementById('editEventEndTime').value = evt.end_time || '';
             document.getElementById('editEventColorKey').value = evt.color_key || 'other';
@@ -1582,7 +1598,8 @@
     function saveEditedEvent() {
       const eventId = document.getElementById('editEventId').value;
       const title = document.getElementById('editEventTitle').value.trim();
-      const startDate = document.getElementById('editEventDate').value;
+      let startDate = document.getElementById('editEventStartDate').value;
+      let endDate = document.getElementById('editEventEndDate').value || startDate;
       const startTime = document.getElementById('editEventStartTime').value || null;
       const endTime = document.getElementById('editEventEndTime').value || null;
       const colorKey = document.getElementById('editEventColorKey').value;
@@ -1597,11 +1614,18 @@
         return;
       }
 
+      // end_dateがstart_dateより前なら入れ替え
+      if (endDate < startDate) {
+        const tmp = startDate;
+        startDate = endDate;
+        endDate = tmp;
+      }
+
       const payload = {
         event_id: eventId,
         title: title,
         start_date: startDate,
-        end_date: startDate,  // 単日予定として扱う
+        end_date: endDate,
         start_time: startTime,
         end_time: endTime,
         all_day: !startTime,
@@ -1678,10 +1702,20 @@
 
     function confirmCalendarEvent() {
       // フォームから現在の値を取得
+      let startDate = document.getElementById('modalEventStartDate').value;
+      let endDate = document.getElementById('modalEventEndDate').value || startDate;
+
+      // end_dateがstart_dateより前なら入れ替え
+      if (endDate < startDate) {
+        const tmp = startDate;
+        startDate = endDate;
+        endDate = tmp;
+      }
+
       const eventData = {
         title: document.getElementById('modalEventTitle').value.trim(),
-        start_date: document.getElementById('modalEventDate').value,
-        end_date: document.getElementById('modalEventDate').value,
+        start_date: startDate,
+        end_date: endDate,
         start_time: document.getElementById('modalEventStartTime').value || null,
         end_time: document.getElementById('modalEventEndTime').value || null,
         memo: document.getElementById('modalEventMemo').value.trim() || null,

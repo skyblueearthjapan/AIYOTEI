@@ -186,6 +186,16 @@ function isDateInRange(targetDate, startDate, endDate) {
 }
 
 /**
+ * YYYY-MM-DD文字列をローカルDateに変換（UTC解釈を防ぐ）
+ * @param {string} dateStr - YYYY-MM-DD形式
+ * @returns {Date} ローカル日付オブジェクト
+ */
+function parseLocalDate(dateStr) {
+  const parts = dateStr.split('-');
+  return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+}
+
+/**
  * 指定月のイベント一覧を取得
  * @param {number} year - 年
  * @param {number} month - 月（1-12）
@@ -226,8 +236,9 @@ function getEventsByMonth(year, month) {
       const eventStart = startDate < monthStart ? monthStart : startDate;
       const eventEnd = endDate > monthEnd ? monthEnd : endDate;
 
-      let current = new Date(eventStart);
-      const end = new Date(eventEnd);
+      // parseLocalDateでUTC解釈を防ぐ
+      let current = parseLocalDate(eventStart);
+      const end = parseLocalDate(eventEnd);
 
       while (current <= end) {
         const dateKey = Utilities.formatDate(current, tz, 'yyyy-MM-dd');
