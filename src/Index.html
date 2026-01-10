@@ -868,11 +868,19 @@
     }
 
     function renderCalendar() {
-      document.getElementById('calendarMonth').textContent =
-        `${state.currentYear}年${state.currentMonth}月`;
+      try {
+        // nullチェック：データがまだ無い場合は何もしない
+        if (!state.currentYear || !state.currentMonth) {
+          console.warn('renderCalendar: state not ready');
+          return;
+        }
 
-      const container = document.getElementById('calendarDays');
-      container.innerHTML = '';
+        document.getElementById('calendarMonth').textContent =
+          `${state.currentYear}年${state.currentMonth}月`;
+
+        const container = document.getElementById('calendarDays');
+        if (!container) return;
+        container.innerHTML = '';
 
       const firstDay = new Date(state.currentYear, state.currentMonth - 1, 1);
       const lastDay = new Date(state.currentYear, state.currentMonth, 0);
@@ -899,6 +907,11 @@
         const nextYear = state.currentMonth === 12 ? state.currentYear + 1 : state.currentYear;
         container.appendChild(createDayCell(day, true, nextYear, nextMonth));
       }
+      } catch (e) {
+        console.error('renderCalendar crashed:', e);
+        // 無限ループ防止：再試行せずエラー表示のみ
+        showToast('カレンダー描画エラー。ページを再読み込みしてください。');
+      }
     }
 
     function createDayCell(day, isOtherMonth, year, month) {
@@ -917,28 +930,30 @@
       dayNum.textContent = day;
       cell.appendChild(dayNum);
 
-      // 六曜
-      if (state.calendarData.rokuyo && state.calendarData.rokuyo[dateStr]) {
+      // 六曜（安全なnullガード付き）
+      const rokuyoText = state.calendarData?.rokuyo?.[dateStr] ?? '';
+      if (rokuyoText) {
         const rokuyo = document.createElement('div');
         rokuyo.className = 'day-rokuyo';
-        rokuyo.textContent = state.calendarData.rokuyo[dateStr];
+        rokuyo.textContent = rokuyoText;
         cell.appendChild(rokuyo);
       }
 
-      // イベント
-      if (state.calendarData.events && state.calendarData.events[dateStr]) {
+      // イベント（安全なnullガード付き）
+      const dayEvents = state.calendarData?.events?.[dateStr];
+      if (dayEvents && dayEvents.length > 0) {
         const eventsDiv = document.createElement('div');
         eventsDiv.className = 'day-events';
-        state.calendarData.events[dateStr].slice(0, 2).forEach(evt => {
+        dayEvents.slice(0, 2).forEach(evt => {
           const eventEl = document.createElement('div');
           eventEl.className = 'day-event';
-          eventEl.textContent = evt.title;
+          eventEl.textContent = evt?.title ?? '';
           eventsDiv.appendChild(eventEl);
         });
-        if (state.calendarData.events[dateStr].length > 2) {
+        if (dayEvents.length > 2) {
           const more = document.createElement('div');
           more.className = 'day-event-more';
-          more.textContent = `+${state.calendarData.events[dateStr].length - 2}件`;
+          more.textContent = `+${dayEvents.length - 2}件`;
           eventsDiv.appendChild(more);
         }
         cell.appendChild(eventsDiv);
