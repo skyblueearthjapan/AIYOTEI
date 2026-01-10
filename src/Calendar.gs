@@ -40,6 +40,7 @@ function insertEventToDB(eventData, rawText, source = 'text') {
 
   // 新しい行データを作成
   const newRow = createEventRow(eventData, rawText, source, model);
+  const eventId = newRow[EVENT_COLS.EVENT_ID]; // 生成されたevent_idを取得
 
   // 最終行の次に追加
   const lastRow = sheet.getLastRow();
@@ -53,6 +54,9 @@ function insertEventToDB(eventData, rawText, source = 'text') {
   } catch (e) {
     console.error('Log write error:', e);
   }
+
+  // 生成されたevent_idを返す
+  return eventId;
 }
 
 /**

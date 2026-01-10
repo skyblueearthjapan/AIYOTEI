@@ -629,6 +629,60 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    /* ===== ミニローディング（AI処理中） ===== */
+    .mini-loading {
+      display: none;
+      position: fixed;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #7986cb 0%, #5c6bc0 100%);
+      color: white;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-size: 13px;
+      z-index: 2500;
+      box-shadow: 0 4px 12px rgba(92, 107, 192, 0.4);
+      align-items: center;
+      gap: 8px;
+    }
+
+    .mini-loading.show {
+      display: flex;
+    }
+
+    .mini-loading-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* ===== 保存中インジケータ ===== */
+    .save-indicator {
+      display: none;
+      position: fixed;
+      bottom: 140px;
+      right: 20px;
+      background: #4caf50;
+      color: white;
+      padding: 6px 14px;
+      border-radius: 16px;
+      font-size: 12px;
+      z-index: 2500;
+      box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
+    }
+
+    .save-indicator.show {
+      display: block;
+    }
+
+    .save-indicator.error {
+      background: #f44336;
+    }
   </style>
 </head>
 <body>
@@ -828,7 +882,16 @@
   <!-- トースト -->
   <div class="toast" id="toast"></div>
 
-  <!-- ローディング -->
+  <!-- ミニローディング（AI処理中） -->
+  <div class="mini-loading" id="miniLoading">
+    <div class="mini-loading-spinner"></div>
+    <span id="miniLoadingText">AI処理中...</span>
+  </div>
+
+  <!-- 保存インジケータ -->
+  <div class="save-indicator" id="saveIndicator">保存中...</div>
+
+  <!-- ローディング（初回読み込み用） -->
   <div class="loading-overlay" id="loading">
     <div class="loading-spinner"></div>
   </div>
@@ -1302,10 +1365,11 @@
       const text = input.value.trim();
       if (!text) return;
 
-      showLoading(true);
+      // ミニローディング表示（画面は操作可能）
+      showMiniLoading(true, 'AI解析中...');
       google.script.run
         .withSuccessHandler(function(result) {
-          showLoading(false);
+          showMiniLoading(false);
           if (result.success) {
             state.pendingEventData = result.data;
             state.pendingEventRaw = text;
@@ -1314,7 +1378,10 @@
             showToast('エラー: ' + result.error);
           }
         })
-        .withFailureHandler(handleError)
+        .withFailureHandler(function(error) {
+          showMiniLoading(false);
+          handleError(error);
+        })
         .previewCalendarParse(text);
     }
 
@@ -1323,10 +1390,11 @@
       const text = input.value.trim();
       if (!text) return;
 
-      showLoading(true);
+      // ミニローディング表示（画面は操作可能）
+      showMiniLoading(true, 'AI整形中...');
       google.script.run
         .withSuccessHandler(function(result) {
-          showLoading(false);
+          showMiniLoading(false);
           if (result.success) {
             state.pendingMemoText = result.cleanedText;
             state.pendingMemoRaw = text;
@@ -1335,7 +1403,10 @@
             showToast('エラー: ' + result.error);
           }
         })
-        .withFailureHandler(handleError)
+        .withFailureHandler(function(error) {
+          showMiniLoading(false);
+          handleError(error);
+        })
         .previewMemoCleaning(text);
     }
 
@@ -1538,21 +1609,31 @@
         memo: memo || null
       };
 
-      showLoading(true);
+      // === Optimistic UI: 即座にカレンダーに反映 ===
+      hideModal('eventEdit');
+
+      // 古いイベントを削除して新しいイベントを追加
+      removeEventFromCalendarData(eventId);
+      addEventToCalendarData(payload);
+      renderCalendar();
+      showSaveIndicator(true);
+
+      // バックグラウンドで保存
       google.script.run
         .withSuccessHandler(function(result) {
-          showLoading(false);
+          showSaveIndicator(false);
           if (result.success) {
             showToast(result.message || '予定を更新しました');
-            hideModal('eventEdit');
-            // カレンダーを再読み込み
-            loadCalendarDataSafe();
           } else {
+            // 失敗：カレンダーを再読み込みして元に戻す
+            loadCalendarDataSafe();
             showToast('エラー: ' + (result.error || '更新に失敗しました'));
           }
         })
         .withFailureHandler(function(error) {
-          showLoading(false);
+          showSaveIndicator(false, true);
+          // 失敗：カレンダーを再読み込みして元に戻す
+          loadCalendarDataSafe();
           console.error('updateEventData failed:', error);
           showToast('更新に失敗しました');
         })
@@ -1567,21 +1648,28 @@
         return;
       }
 
-      showLoading(true);
+      // === Optimistic UI: 即座にカレンダーから削除 ===
+      hideModal('eventEdit');
+      removeEventFromCalendarData(eventId);
+      renderCalendar();
+      showSaveIndicator(true);
+
+      // バックグラウンドで削除
       google.script.run
         .withSuccessHandler(function(result) {
-          showLoading(false);
+          showSaveIndicator(false);
           if (result.success) {
             showToast(result.message || '予定を削除しました');
-            hideModal('eventEdit');
-            // カレンダーを再読み込み
-            loadCalendarDataSafe();
           } else {
+            // 失敗：カレンダーを再読み込みして元に戻す
+            loadCalendarDataSafe();
             showToast('エラー: ' + (result.error || '削除に失敗しました'));
           }
         })
         .withFailureHandler(function(error) {
-          showLoading(false);
+          showSaveIndicator(false, true);
+          // 失敗：カレンダーを再読み込みして元に戻す
+          loadCalendarDataSafe();
           console.error('deleteEventData failed:', error);
           showToast('削除に失敗しました');
         })
@@ -1597,7 +1685,8 @@
         start_time: document.getElementById('modalEventStartTime').value || null,
         end_time: document.getElementById('modalEventEndTime').value || null,
         memo: document.getElementById('modalEventMemo').value.trim() || null,
-        all_day: !document.getElementById('modalEventStartTime').value
+        all_day: !document.getElementById('modalEventStartTime').value,
+        color_key: state.pendingEventData?.color_key || guessColorKeyFromTitle(document.getElementById('modalEventTitle').value.trim())
       };
 
       // タイトル必須チェック
@@ -1613,22 +1702,104 @@
       }
 
       hideModal('calendar');
-      showLoading(true);
+      document.getElementById('calendarTextInput').value = '';
 
-      // フォームの値でイベントを直接登録
+      // === Optimistic UI: 即座にカレンダーに反映 ===
+      const tempEventId = 'temp_' + Date.now();
+      const tempEvent = {
+        event_id: tempEventId,
+        title: eventData.title,
+        start_date: eventData.start_date,
+        end_date: eventData.end_date,
+        start_time: eventData.start_time,
+        end_time: eventData.end_time,
+        all_day: eventData.all_day,
+        memo: eventData.memo,
+        color_key: eventData.color_key
+      };
+
+      // カレンダーに仮追加
+      addEventToCalendarData(tempEvent);
+      renderCalendar();
+      showSaveIndicator(true);
+
+      // バックグラウンドで保存
       google.script.run
         .withSuccessHandler(function(result) {
-          showLoading(false);
+          showSaveIndicator(false);
           if (result.success) {
+            // 成功：仮イベントを実際のイベントに置換（IDを更新）
+            if (result.event_id) {
+              replaceEventId(tempEventId, result.event_id);
+            }
             showToast(result.message);
-            document.getElementById('calendarTextInput').value = '';
-            loadCalendarDataSafe();
           } else {
+            // 失敗：仮イベントを削除
+            removeEventFromCalendarData(tempEventId);
+            renderCalendar();
             showToast('エラー: ' + result.error);
           }
         })
-        .withFailureHandler(handleError)
+        .withFailureHandler(function(error) {
+          showSaveIndicator(false, true);
+          // 失敗：仮イベントを削除
+          removeEventFromCalendarData(tempEventId);
+          renderCalendar();
+          console.error(error);
+          showToast('保存に失敗しました');
+        })
         .registerEventDirect(eventData, state.pendingEventRaw || '');
+    }
+
+    // === Optimistic UI ヘルパー関数 ===
+
+    // カレンダーデータにイベントを追加
+    function addEventToCalendarData(event) {
+      const dateStr = event.start_date;
+      if (!state.calendarData.events[dateStr]) {
+        state.calendarData.events[dateStr] = [];
+      }
+      state.calendarData.events[dateStr].push(event);
+
+      // 複数日にまたがる場合も追加
+      if (event.end_date && event.end_date !== event.start_date) {
+        let current = toLocalDate(event.start_date);
+        const end = toLocalDate(event.end_date);
+        current.setDate(current.getDate() + 1); // start_dateは既に追加済み
+
+        while (current <= end) {
+          const d = toDateString(current);
+          if (!state.calendarData.events[d]) {
+            state.calendarData.events[d] = [];
+          }
+          state.calendarData.events[d].push(event);
+          current.setDate(current.getDate() + 1);
+        }
+      }
+    }
+
+    // カレンダーデータからイベントを削除
+    function removeEventFromCalendarData(eventId) {
+      for (const dateStr in state.calendarData.events) {
+        state.calendarData.events[dateStr] = state.calendarData.events[dateStr].filter(
+          evt => evt.event_id !== eventId
+        );
+        // 空配列を削除
+        if (state.calendarData.events[dateStr].length === 0) {
+          delete state.calendarData.events[dateStr];
+        }
+      }
+    }
+
+    // イベントIDを置換（仮ID → 実ID）
+    function replaceEventId(oldId, newId) {
+      for (const dateStr in state.calendarData.events) {
+        state.calendarData.events[dateStr].forEach(evt => {
+          if (evt.event_id === oldId) {
+            evt.event_id = newId;
+          }
+        });
+      }
     }
 
     function confirmMemoAppend() {
@@ -1816,6 +1987,37 @@
       document.getElementById('loading').classList.toggle('show', show);
     }
 
+    // ミニローディング（AI処理中などに使用）
+    function showMiniLoading(show, text = 'AI処理中...') {
+      const el = document.getElementById('miniLoading');
+      const textEl = document.getElementById('miniLoadingText');
+      if (show) {
+        textEl.textContent = text;
+        el.classList.add('show');
+      } else {
+        el.classList.remove('show');
+      }
+    }
+
+    // 保存インジケータ
+    let saveIndicatorTimer = null;
+    function showSaveIndicator(show, isError = false) {
+      const el = document.getElementById('saveIndicator');
+      if (saveIndicatorTimer) clearTimeout(saveIndicatorTimer);
+
+      if (show) {
+        el.textContent = isError ? '保存失敗' : '保存中...';
+        el.classList.toggle('error', isError);
+        el.classList.add('show');
+        if (isError) {
+          saveIndicatorTimer = setTimeout(() => el.classList.remove('show'), 2000);
+        }
+      } else {
+        el.textContent = '保存完了';
+        saveIndicatorTimer = setTimeout(() => el.classList.remove('show'), 800);
+      }
+    }
+
     function showToast(message) {
       const toast = document.getElementById('toast');
       toast.textContent = message;
@@ -1825,6 +2027,7 @@
 
     function handleError(error) {
       showLoading(false);
+      showMiniLoading(false);
       console.error(error);
       showToast('エラーが発生しました');
     }

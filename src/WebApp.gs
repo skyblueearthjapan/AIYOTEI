@@ -203,12 +203,13 @@ function registerEventDirect(eventData, rawText) {
       eventData.end_date = eventData.start_date;
     }
 
-    // DBに登録
-    insertEventToDB(eventData, rawText || '', 'text');
+    // DBに登録（生成されたevent_idが返る）
+    const eventId = insertEventToDB(eventData, rawText || '', 'text');
 
     return {
       success: true,
       data: eventData,
+      event_id: eventId,
       message: `予定「${eventData.title}」を登録しました`
     };
   } catch (error) {
