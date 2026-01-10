@@ -58,15 +58,50 @@ function getInitialData() {
  * @returns {Object}
  */
 function getCalendarData(year, month) {
-  const events = getEventsByMonth(year, month);
-  const rokuyo = getRokuyoByMonth(year, month);
+  try {
+    // 引数チェック
+    const now = new Date();
+    const tz = 'Asia/Tokyo';
+    const y = year || Number(Utilities.formatDate(now, tz, 'yyyy'));
+    const m = month || Number(Utilities.formatDate(now, tz, 'MM'));
 
-  return {
-    year: year,
-    month: month,
-    events: events,
-    rokuyo: rokuyo
-  };
+    console.log('getCalendarData called:', y, m);
+
+    // イベント取得（失敗したら空オブジェクト）
+    let events = {};
+    try {
+      events = getEventsByMonth(y, m) || {};
+    } catch (e) {
+      console.error('getEventsByMonth error:', e);
+    }
+
+    // 六曜取得（失敗したら空オブジェクト）
+    let rokuyo = {};
+    try {
+      rokuyo = getRokuyoByMonth(y, m) || {};
+    } catch (e) {
+      console.error('getRokuyoByMonth error:', e);
+    }
+
+    console.log('getCalendarData returning events count:', Object.keys(events).length);
+
+    // 必ず events/rokuyo キーで返す（nullは禁止）
+    return {
+      year: y,
+      month: m,
+      events: events,
+      rokuyo: rokuyo
+    };
+  } catch (e) {
+    console.error('getCalendarData error:', e);
+    // エラーでも必ずオブジェクトを返す
+    return {
+      year: year || new Date().getFullYear(),
+      month: month || new Date().getMonth() + 1,
+      events: {},
+      rokuyo: {}
+    };
+  }
 }
 
 /**
