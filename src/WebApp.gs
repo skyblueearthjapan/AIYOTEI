@@ -86,12 +86,14 @@ function getCalendarData(year, month) {
     console.log('getCalendarData returning events count:', Object.keys(events).length);
 
     // 必ず events/rokuyo キーで返す（nullは禁止）
-    return {
+    // JSON.parse(JSON.stringify()) で Date オブジェクトを確実に文字列化
+    const result = {
       year: y,
       month: m,
       events: events,
       rokuyo: rokuyo
     };
+    return JSON.parse(JSON.stringify(result));
   } catch (e) {
     console.error('getCalendarData error:', e);
     // エラーでも必ずオブジェクトを返す

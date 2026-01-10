@@ -115,8 +115,8 @@ function getEventsByDate(dateStr) {
         title: row[EVENT_COLS.TITLE],
         start_date: startDate,
         end_date: endDate,
-        start_time: row[EVENT_COLS.START_TIME] || null,
-        end_time: row[EVENT_COLS.END_TIME] || null,
+        start_time: formatTimeValue(row[EVENT_COLS.START_TIME], tz),
+        end_time: formatTimeValue(row[EVENT_COLS.END_TIME], tz),
         all_day: row[EVENT_COLS.ALL_DAY] === 'TRUE' || row[EVENT_COLS.ALL_DAY] === true,
         memo: row[EVENT_COLS.MEMO] || null
       });
@@ -137,6 +137,34 @@ function formatDateValue(value, tz) {
     return Utilities.formatDate(value, tz, 'yyyy-MM-dd');
   }
   return String(value);
+}
+
+/**
+ * 時刻値をフォーマット（Date/文字列 → "HH:mm" 文字列）
+ * @param {Date|string|null} value - 時刻値
+ * @param {string} tz - タイムゾーン
+ * @returns {string|null} HH:mm形式、または null
+ */
+function formatTimeValue(value, tz) {
+  if (value == null || value === '') return null;
+
+  // Date オブジェクトの場合
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, tz, 'HH:mm');
+  }
+
+  // 文字列の場合
+  const s = String(value).trim();
+  if (!s) return null;
+
+  // "HH:mm" または "H:mm" 形式を正規化
+  const m = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (m) {
+    return String(m[1]).padStart(2, '0') + ':' + m[2];
+  }
+
+  // その他（そのまま返す）
+  return s;
 }
 
 /**
@@ -183,7 +211,7 @@ function getEventsByMonth(year, month) {
         title: row[EVENT_COLS.TITLE],
         start_date: startDate,
         end_date: endDate,
-        start_time: row[EVENT_COLS.START_TIME] || null
+        start_time: formatTimeValue(row[EVENT_COLS.START_TIME], tz)
       };
 
       // イベントが含まれる各日に追加
