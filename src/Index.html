@@ -683,6 +683,54 @@
     .save-indicator.error {
       background: #f44336;
     }
+
+    /* ===== 同期ステータスバッジ ===== */
+    .sync-status {
+      display: none;
+      position: fixed;
+      top: 70px;
+      right: 16px;
+      padding: 6px 12px;
+      border-radius: 12px;
+      font-size: 11px;
+      z-index: 2500;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.3s ease;
+    }
+
+    .sync-status.show {
+      display: flex;
+    }
+
+    .sync-status.syncing {
+      background: rgba(92, 107, 192, 0.9);
+      color: white;
+    }
+
+    .sync-status.synced {
+      background: rgba(76, 175, 80, 0.9);
+      color: white;
+    }
+
+    .sync-status.error {
+      background: rgba(244, 67, 54, 0.9);
+      color: white;
+    }
+
+    .sync-status.offline {
+      background: rgba(158, 158, 158, 0.9);
+      color: white;
+    }
+
+    .sync-spinner {
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
   </style>
 </head>
 <body>
@@ -903,6 +951,12 @@
   <!-- 保存インジケータ -->
   <div class="save-indicator" id="saveIndicator">保存中...</div>
 
+  <!-- 同期ステータス -->
+  <div class="sync-status" id="syncStatus">
+    <div class="sync-spinner"></div>
+    <span id="syncStatusText">同期中...</span>
+  </div>
+
   <!-- ローディング（初回読み込み用） -->
   <div class="loading-overlay" id="loading">
     <div class="loading-spinner"></div>
@@ -920,8 +974,21 @@
       pendingEventData: null,
       pendingMemoText: null,
       pendingMemoRaw: null,
-      memoOriginalText: ''  // メモの変更検知用
+      memoOriginalText: '',  // メモの変更検知用
+      // キャッシュ
+      cache: {
+        calendar: {},       // { "2026-01": { events, rokuyo, holidays, cachedAt } }
+        memos: {},          // { "2026-01-10": { text, cachedAt } }
+        lastSync: null      // 最終同期時刻
+      },
+      // 同期状態
+      syncPending: 0,       // 保留中の同期数
+      memoVersion: 0        // メモの競合防止用バージョン
     };
+
+    // ===== 同期キュー =====
+    let syncQueue = [];
+    let isSyncing = false;
 
     // ===== 無限ループ防止ガード =====
     let __calendarLoading = false;
@@ -1030,6 +1097,12 @@
 
     // ===== タブ切り替え =====
     function switchTab(page) {
+      // メモタブから離れる場合は未保存のメモを保存
+      const currentTab = document.querySelector('.tab-btn.active')?.dataset.page;
+      if (currentTab === 'memo' && page !== 'memo') {
+        flushMemoSave();
+      }
+
       document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.page === page);
       });
@@ -1049,6 +1122,24 @@
     // ===== カレンダー =====
     function loadCalendarDataSafe() {
       if (__calendarLoading) return; // 二重起動防止
+
+      const year = state.currentYear;
+      const month = state.currentMonth;
+
+      // キャッシュがあれば先に表示（体感ゼロ秒）
+      const cached = getCalendarCache(year, month);
+      if (cached) {
+        state.calendarData = {
+          events: cached.events || {},
+          rokuyo: cached.rokuyo || {},
+          holidays: cached.holidays || {}
+        };
+        renderCalendar();
+        showLoading(false);
+        // バックグラウンドで更新
+        showSyncStatus('syncing', '更新中...');
+      }
+
       __calendarLoading = true;
 
       google.script.run
@@ -1056,26 +1147,39 @@
           __calendarLoading = false;
           __calendarRetry = 0; // 成功でリトライリセット
 
-          // デバッグ用ログ
-          console.log('getCalendarData response:', data);
-          console.log('events:', data?.events);
-          console.log('rokuyo:', data?.rokuyo);
-
           // dataがnullの場合のフォールバック
-          state.calendarData = data || { events: {}, rokuyo: {}, holidays: {} };
+          const calendarData = data || { events: {}, rokuyo: {}, holidays: {} };
 
           // eventsやrokuyoがnullの場合も安全に処理
-          if (!state.calendarData.events) state.calendarData.events = {};
-          if (!state.calendarData.rokuyo) state.calendarData.rokuyo = {};
-          if (!state.calendarData.holidays) state.calendarData.holidays = {};
+          if (!calendarData.events) calendarData.events = {};
+          if (!calendarData.rokuyo) calendarData.rokuyo = {};
+          if (!calendarData.holidays) calendarData.holidays = {};
 
-          renderCalendar();
+          // キャッシュに保存
+          setCalendarCache(year, month, calendarData);
+
+          // 現在表示中の月と同じ場合のみ更新
+          if (state.currentYear === year && state.currentMonth === month) {
+            state.calendarData = calendarData;
+            renderCalendar();
+          }
+
           showLoading(false);
+          if (cached) {
+            showSyncStatus('synced');
+          }
         })
         .withFailureHandler(function(error) {
           __calendarLoading = false;
           console.error("loadCalendarData failed:", error);
           __calendarRetry++;
+
+          // キャッシュがあった場合はエラーでも継続
+          if (cached) {
+            showSyncStatus('error', '更新失敗');
+            return;
+          }
+
           if (__calendarRetry >= MAX_RETRY) {
             showLoading(false);
             showToast("読み込みに失敗しました。ページを再読み込みしてください。");
@@ -1084,7 +1188,7 @@
           // 少し待ってからリトライ
           setTimeout(loadCalendarDataSafe, 800);
         })
-        .getCalendarData(state.currentYear, state.currentMonth);
+        .getCalendarData(year, month);
     }
 
     function changeMonth(delta) {
@@ -1246,6 +1350,9 @@
     }
 
     function changeMemoDay(delta) {
+      // 日付を変える前に未保存のメモを保存
+      flushMemoSave();
+
       const d = toLocalDate(state.memoDate);
       d.setDate(d.getDate() + delta);
       state.memoDate = toDateString(d);
@@ -1292,6 +1399,76 @@
       const currentText = document.getElementById('memoText').value;
       const isDirty = currentText !== state.memoOriginalText;
       document.getElementById('saveMemoBtn').disabled = !isDirty;
+
+      // 変更があればデバウンス保存をスケジュール
+      if (isDirty) {
+        scheduleMemoAutoSave();
+      }
+    }
+
+    // ===== メモ自動保存（デバウンス） =====
+    let memoAutoSaveTimer = null;
+    const MEMO_AUTOSAVE_DELAY = 1500; // 1.5秒
+
+    function scheduleMemoAutoSave() {
+      if (memoAutoSaveTimer) {
+        clearTimeout(memoAutoSaveTimer);
+      }
+      memoAutoSaveTimer = setTimeout(() => {
+        saveMemoSilent();
+      }, MEMO_AUTOSAVE_DELAY);
+    }
+
+    function cancelMemoAutoSave() {
+      if (memoAutoSaveTimer) {
+        clearTimeout(memoAutoSaveTimer);
+        memoAutoSaveTimer = null;
+      }
+    }
+
+    // 即時保存（ナビゲーション前に呼ぶ）
+    function flushMemoSave() {
+      cancelMemoAutoSave();
+      const currentText = document.getElementById('memoText').value;
+      if (currentText !== state.memoOriginalText) {
+        saveMemoSilent();
+      }
+    }
+
+    // サイレント保存（トースト無し、ステータスバッジのみ）
+    function saveMemoSilent() {
+      const el = document.getElementById('memoText');
+      const currentText = el.value;
+
+      // 変更がなければスキップ
+      if (currentText === state.memoOriginalText) return;
+
+      // バージョンをインクリメント
+      const saveVersion = ++state.memoVersion;
+      const normalized = normalizeToBullets(currentText, { splitByPeriod: true });
+
+      showSyncStatus('syncing', 'メモ保存中...');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          // 保存中に別の変更があった場合はスキップ
+          if (state.memoVersion !== saveVersion) return;
+
+          if (result.success) {
+            state.memoOriginalText = normalized;
+            el.value = normalized; // UIも更新
+            updateSaveButtonState();
+            showSyncStatus('synced', 'メモ保存完了');
+          } else {
+            showSyncStatus('error', '保存失敗');
+          }
+        })
+        .withFailureHandler(function(error) {
+          if (state.memoVersion !== saveVersion) return;
+          console.error('saveMemo failed:', error);
+          showSyncStatus('error', 'メモ保存失敗');
+        })
+        .saveMemo(state.memoDate, normalized);
     }
 
     // 黒丸（•）自動変換関数
@@ -2057,6 +2234,119 @@
       toast.textContent = message;
       toast.classList.add('show');
       setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    // ===== 同期ステータス =====
+    let syncStatusTimer = null;
+    function showSyncStatus(kind, text) {
+      const el = document.getElementById('syncStatus');
+      const textEl = document.getElementById('syncStatusText');
+      if (syncStatusTimer) clearTimeout(syncStatusTimer);
+
+      // クラスをリセット
+      el.classList.remove('syncing', 'synced', 'error', 'offline');
+
+      if (kind === 'hide') {
+        el.classList.remove('show');
+        return;
+      }
+
+      el.classList.add(kind, 'show');
+      textEl.textContent = text || {
+        syncing: '同期中...',
+        synced: '同期完了',
+        error: '同期失敗',
+        offline: 'オフライン'
+      }[kind];
+
+      // synced と error は自動で消す
+      if (kind === 'synced') {
+        syncStatusTimer = setTimeout(() => el.classList.remove('show'), 1500);
+      } else if (kind === 'error') {
+        syncStatusTimer = setTimeout(() => el.classList.remove('show'), 3000);
+      }
+    }
+
+    // ===== 同期キュー基盤 =====
+    function enqueueSyncOp(operation) {
+      // operation: { type, payload, apply, revert, commit }
+      syncQueue.push(operation);
+      state.syncPending++;
+      updateSyncStatusFromQueue();
+
+      // 楽観的に適用
+      if (operation.apply) {
+        operation.apply();
+      }
+
+      // キュー処理を開始
+      processQueue();
+    }
+
+    async function processQueue() {
+      if (isSyncing || syncQueue.length === 0) return;
+      isSyncing = true;
+
+      while (syncQueue.length > 0) {
+        const op = syncQueue[0];
+        try {
+          await op.commit();
+          syncQueue.shift();
+          state.syncPending--;
+        } catch (e) {
+          console.error('Sync failed:', op.type, e);
+          // リバート
+          if (op.revert) {
+            op.revert();
+          }
+          syncQueue.shift();
+          state.syncPending--;
+          showSyncStatus('error', '同期失敗');
+        }
+      }
+
+      isSyncing = false;
+      updateSyncStatusFromQueue();
+    }
+
+    function updateSyncStatusFromQueue() {
+      if (state.syncPending > 0) {
+        showSyncStatus('syncing', `同期中 (${state.syncPending})`);
+      } else if (syncQueue.length === 0) {
+        showSyncStatus('synced');
+      }
+    }
+
+    // ===== キャッシュユーティリティ =====
+    const CACHE_TTL = 5 * 60 * 1000; // 5分
+
+    function getCacheKey(year, month) {
+      return `${year}-${String(month).padStart(2, '0')}`;
+    }
+
+    function getCalendarCache(year, month) {
+      const key = getCacheKey(year, month);
+      const cached = state.cache.calendar[key];
+      if (!cached) return null;
+      // TTLチェック
+      if (Date.now() - cached.cachedAt > CACHE_TTL) {
+        delete state.cache.calendar[key];
+        return null;
+      }
+      return cached;
+    }
+
+    function setCalendarCache(year, month, data) {
+      const key = getCacheKey(year, month);
+      state.cache.calendar[key] = {
+        ...data,
+        cachedAt: Date.now()
+      };
+    }
+
+    function invalidateCalendarCache(year, month) {
+      const key = getCacheKey(year, month);
+      delete state.cache.calendar[key];
     }
 
     function handleError(error) {
