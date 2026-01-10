@@ -261,6 +261,74 @@ function getMemoData(dateStr) {
 }
 
 /**
+ * 指定日のメモを保存（上書き）（Webアプリから呼び出し）
+ * @param {string} dateStr - 日付（YYYY-MM-DD）
+ * @param {string} text - メモテキスト
+ * @returns {Object}
+ */
+function saveMemo(dateStr, text) {
+  try {
+    const sheet = getSheet(SHEET_NAMES.DB_MEMOS);
+    const data = sheet.getDataRange().getValues();
+    const tz = getSettings().timezone;
+
+    // 既存の行を探す
+    let existingRowIndex = -1;
+    for (let i = 2; i < data.length; i++) {
+      const rowDate = data[i][MEMO_COLS.DATE];
+      let dateValue;
+      if (rowDate instanceof Date) {
+        dateValue = Utilities.formatDate(rowDate, tz, 'yyyy-MM-dd');
+      } else {
+        dateValue = String(rowDate);
+      }
+      if (dateValue === dateStr) {
+        existingRowIndex = i;
+        break;
+      }
+    }
+
+    if (existingRowIndex >= 0) {
+      // 既存行を上書き
+      const rowNum = existingRowIndex + 1;
+      sheet.getRange(rowNum, MEMO_COLS.MEMO_TEXT + 1).setValue(text);
+      sheet.getRange(rowNum, MEMO_COLS.UPDATED_AT + 1).setValue(getCurrentDateTime());
+      return {
+        success: true,
+        mode: 'update',
+        message: 'メモを保存しました'
+      };
+    } else if (text.trim()) {
+      // 新規行を追加（空文字でなければ）
+      const newRow = new Array(9).fill('');
+      newRow[MEMO_COLS.MEMO_ID] = newMemoId();
+      newRow[MEMO_COLS.DATE] = dateStr;
+      newRow[MEMO_COLS.MEMO_TEXT] = text;
+      newRow[MEMO_COLS.CREATED_AT] = getCurrentDateTime();
+      const lastRow = sheet.getLastRow();
+      sheet.getRange(lastRow + 1, 1, 1, newRow.length).setValues([newRow]);
+      return {
+        success: true,
+        mode: 'insert',
+        message: 'メモを保存しました'
+      };
+    } else {
+      // 新規で空文字の場合は何もしない
+      return {
+        success: true,
+        mode: 'skip',
+        message: '保存するメモがありません'
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
  * 指定日の予定を取得（Webアプリから呼び出し）
  * @param {string} dateStr - 日付（YYYY-MM-DD）
  * @returns {Object}

@@ -645,13 +645,16 @@
       <button class="memo-nav-btn" id="nextDayBtn">▶</button>
     </div>
 
-    <!-- メモ表示 -->
+    <!-- メモ表示・編集 -->
     <div class="memo-container">
       <div class="memo-header">
         <div class="memo-label">📝 この日のメモ</div>
-        <button class="copy-btn" id="copyMemoBtn">コピー</button>
+        <div style="display: flex; gap: 8px;">
+          <button class="copy-btn" id="copyMemoBtn">コピー</button>
+          <button class="copy-btn" id="saveMemoBtn" style="background: #5c6bc0; color: white;" disabled>保存</button>
+        </div>
       </div>
-      <textarea class="memo-text" id="memoText" placeholder="メモがありません" readonly></textarea>
+      <textarea class="memo-text" id="memoText" placeholder="メモを入力してください..."></textarea>
     </div>
 
     <!-- 音声入力 -->
@@ -732,7 +735,8 @@
       calendarData: { events: {}, rokuyo: {} },
       pendingEventData: null,
       pendingMemoText: null,
-      pendingMemoRaw: null
+      pendingMemoRaw: null,
+      memoOriginalText: ''  // メモの変更検知用
     };
 
     // ===== 無限ループ防止ガード =====
@@ -810,6 +814,12 @@
 
       // コピーボタン
       document.getElementById('copyMemoBtn').addEventListener('click', copyMemo);
+
+      // 保存ボタン
+      document.getElementById('saveMemoBtn').addEventListener('click', saveMemoText);
+
+      // メモテキストエリアの変更検知
+      document.getElementById('memoText').addEventListener('input', updateSaveButtonState);
 
       // モーダル
       document.getElementById('calendarModalCancel').addEventListener('click', () => hideModal('calendar'));
@@ -1007,7 +1017,10 @@
         .withSuccessHandler(function(data) {
           __memoLoading = false;
           __memoRetry = 0; // 成功でリトライリセット
-          document.getElementById('memoText').value = data.text || '';
+          const memoText = data.text || '';
+          document.getElementById('memoText').value = memoText;
+          state.memoOriginalText = memoText;  // 変更検知用に保存
+          updateSaveButtonState();  // 保存ボタン状態をリセット
         })
         .withFailureHandler(function(error) {
           __memoLoading = false;
@@ -1049,6 +1062,36 @@
       navigator.clipboard.writeText(text)
         .then(() => showToast('コピーしました'))
         .catch(() => showToast('コピーに失敗しました'));
+    }
+
+    // ===== メモ保存 =====
+    function updateSaveButtonState() {
+      const currentText = document.getElementById('memoText').value;
+      const isDirty = currentText !== state.memoOriginalText;
+      document.getElementById('saveMemoBtn').disabled = !isDirty;
+    }
+
+    function saveMemoText() {
+      const text = document.getElementById('memoText').value;
+      showLoading(true);
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showLoading(false);
+          if (result.success) {
+            showToast(result.message);
+            state.memoOriginalText = text;  // 保存後に原本を更新
+            updateSaveButtonState();  // ボタン状態を更新
+          } else {
+            showToast('エラー: ' + result.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          showLoading(false);
+          console.error('saveMemo failed:', error);
+          showToast('保存に失敗しました');
+        })
+        .saveMemo(state.memoDate, text);
     }
 
     // ===== 入力処理 =====
