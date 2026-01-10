@@ -716,6 +716,20 @@
     </div>
   </div>
 
+  <!-- 日付詳細モーダル -->
+  <div class="modal-overlay" id="dayDetailModal">
+    <div class="modal">
+      <div class="modal-title" id="dayDetailTitle">1月10日（土）</div>
+      <div class="modal-content" id="dayDetailContent">
+        <!-- 予定一覧がここに入る -->
+      </div>
+      <div class="modal-buttons">
+        <button class="modal-btn modal-btn-cancel" id="dayDetailClose">閉じる</button>
+        <button class="modal-btn modal-btn-confirm" id="dayDetailAddEvent">予定を追加</button>
+      </div>
+    </div>
+  </div>
+
   <!-- トースト -->
   <div class="toast" id="toast"></div>
 
@@ -826,6 +840,13 @@
       document.getElementById('calendarModalConfirm').addEventListener('click', confirmCalendarEvent);
       document.getElementById('memoModalCancel').addEventListener('click', () => hideModal('memo'));
       document.getElementById('memoModalConfirm').addEventListener('click', confirmMemoAppend);
+
+      // 日付詳細モーダル
+      document.getElementById('dayDetailClose').addEventListener('click', () => hideModal('dayDetail'));
+      document.getElementById('dayDetailAddEvent').addEventListener('click', () => {
+        hideModal('dayDetail');
+        document.getElementById('calendarTextInput').focus();
+      });
 
       // 音声入力（トグル式：タップで開始/停止）
       document.getElementById('calendarMicBtn').addEventListener('click', () => toggleVoiceInput('calendar'));
@@ -997,10 +1018,8 @@
 
       cell.addEventListener('click', () => {
         state.selectedDate = dateStr;
-        state.memoDate = dateStr;
         renderCalendar();
-        loadMemoDataSafe();
-        switchTab('memo');
+        openDayDetailModal(dateStr);
       });
 
       return cell;
@@ -1163,6 +1182,38 @@
 
     function hideModal(type) {
       document.getElementById(type + 'Modal').classList.remove('show');
+    }
+
+    // ===== 日付詳細モーダル =====
+    function openDayDetailModal(dateStr) {
+      const d = new Date(dateStr);
+      const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+      const titleText = `${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}）`;
+      document.getElementById('dayDetailTitle').textContent = titleText;
+
+      // その日の予定を取得
+      const dayEvents = state.calendarData?.events?.[dateStr] || [];
+
+      let contentHtml = '';
+      if (dayEvents.length === 0) {
+        contentHtml = '<div style="text-align: center; color: #888; padding: 20px;">予定がありません</div>';
+      } else {
+        contentHtml = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+        dayEvents.forEach(evt => {
+          const timeStr = evt.start_time ? evt.start_time.substring(0, 5) : '終日';
+          contentHtml += `
+            <div style="background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 100%); padding: 12px; border-radius: 12px;">
+              <div style="font-size: 12px; color: #5c6bc0; font-weight: bold;">${timeStr}</div>
+              <div style="font-size: 14px; font-weight: bold; margin-top: 4px;">${escapeHtml(evt.title || '')}</div>
+              ${evt.memo ? `<div style="font-size: 12px; color: #666; margin-top: 4px;">${escapeHtml(evt.memo)}</div>` : ''}
+            </div>
+          `;
+        });
+        contentHtml += '</div>';
+      }
+
+      document.getElementById('dayDetailContent').innerHTML = contentHtml;
+      document.getElementById('dayDetailModal').classList.add('show');
     }
 
     function confirmCalendarEvent() {
