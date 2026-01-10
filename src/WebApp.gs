@@ -362,6 +362,80 @@ function getEventsData(dateStr) {
 }
 
 /**
+ * 予定を更新（Webアプリから呼び出し）
+ * @param {Object} payload - 更新データ
+ * @returns {Object}
+ */
+function updateEventData(payload) {
+  try {
+    const result = updateEvent(payload);
+    return result;
+  } catch (error) {
+    console.error('updateEventData error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 予定を削除（Webアプリから呼び出し）
+ * @param {string} eventId - イベントID
+ * @returns {Object}
+ */
+function deleteEventData(eventId) {
+  try {
+    const result = deleteEvent(eventId);
+    if (result) {
+      return {
+        success: true,
+        message: '予定を削除しました'
+      };
+    } else {
+      return {
+        success: false,
+        error: '予定が見つかりませんでした'
+      };
+    }
+  } catch (error) {
+    console.error('deleteEventData error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 予定詳細を取得（Webアプリから呼び出し）
+ * @param {string} eventId - イベントID
+ * @returns {Object}
+ */
+function getEventData(eventId) {
+  try {
+    const event = getEventById(eventId);
+    if (event) {
+      return {
+        success: true,
+        event: event
+      };
+    } else {
+      return {
+        success: false,
+        error: '予定が見つかりませんでした'
+      };
+    }
+  } catch (error) {
+    console.error('getEventData error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
  * AI解析のプレビュー（確認用）
  * @param {string} text - 入力テキスト
  * @returns {Object}

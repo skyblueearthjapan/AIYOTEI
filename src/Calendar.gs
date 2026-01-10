@@ -271,6 +271,106 @@ function deleteEvent(eventId) {
   return updateEventStatus(eventId, 'deleted');
 }
 
+/**
+ * イベントを更新
+ * @param {Object} payload - 更新データ
+ * @returns {Object} 結果 { success: boolean, message?: string, error?: string }
+ */
+function updateEvent(payload) {
+  try {
+    const sheet = getSheet(SHEET_NAMES.DB_EVENTS);
+    const data = sheet.getDataRange().getValues();
+    const eventId = payload.event_id;
+
+    if (!eventId) {
+      return { success: false, error: 'event_idが指定されていません' };
+    }
+
+    // event_idで行を検索
+    let targetRow = -1;
+    for (let i = 2; i < data.length; i++) {
+      if (data[i][EVENT_COLS.EVENT_ID] === eventId) {
+        targetRow = i + 1; // 1-indexed for getRange
+        break;
+      }
+    }
+
+    if (targetRow === -1) {
+      return { success: false, error: '指定されたイベントが見つかりません' };
+    }
+
+    // 各フィールドを更新
+    if (payload.title !== undefined) {
+      sheet.getRange(targetRow, EVENT_COLS.TITLE + 1).setValue(payload.title);
+    }
+    if (payload.start_date !== undefined) {
+      sheet.getRange(targetRow, EVENT_COLS.START_DATE + 1).setValue(payload.start_date);
+    }
+    if (payload.end_date !== undefined) {
+      sheet.getRange(targetRow, EVENT_COLS.END_DATE + 1).setValue(payload.end_date);
+    }
+    if (payload.start_time !== undefined) {
+      sheet.getRange(targetRow, EVENT_COLS.START_TIME + 1).setValue(payload.start_time || '');
+    }
+    if (payload.end_time !== undefined) {
+      sheet.getRange(targetRow, EVENT_COLS.END_TIME + 1).setValue(payload.end_time || '');
+    }
+    if (payload.all_day !== undefined) {
+      sheet.getRange(targetRow, EVENT_COLS.ALL_DAY + 1).setValue(payload.all_day ? 'TRUE' : 'FALSE');
+    }
+    if (payload.memo !== undefined) {
+      sheet.getRange(targetRow, EVENT_COLS.MEMO + 1).setValue(payload.memo || '');
+    }
+    if (payload.color_key !== undefined) {
+      sheet.getRange(targetRow, EVENT_COLS.COLOR_KEY + 1).setValue(payload.color_key || 'other');
+    }
+
+    // updated_atを更新
+    sheet.getRange(targetRow, EVENT_COLS.UPDATED_AT + 1).setValue(getCurrentDateTime());
+
+    return { success: true, message: '予定を更新しました' };
+
+  } catch (e) {
+    console.error('updateEvent error:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * イベントIDからイベント詳細を取得
+ * @param {string} eventId - イベントID
+ * @returns {Object|null} イベントデータ
+ */
+function getEventById(eventId) {
+  try {
+    const sheet = getSheet(SHEET_NAMES.DB_EVENTS);
+    const data = sheet.getDataRange().getValues();
+    const tz = getSettings().timezone;
+
+    for (let i = 2; i < data.length; i++) {
+      const row = data[i];
+      if (row[EVENT_COLS.EVENT_ID] === eventId && row[EVENT_COLS.STATUS] === 'active') {
+        return {
+          event_id: row[EVENT_COLS.EVENT_ID],
+          title: row[EVENT_COLS.TITLE],
+          start_date: formatDateValue(row[EVENT_COLS.START_DATE], tz),
+          end_date: formatDateValue(row[EVENT_COLS.END_DATE], tz),
+          start_time: formatTimeValue(row[EVENT_COLS.START_TIME], tz),
+          end_time: formatTimeValue(row[EVENT_COLS.END_TIME], tz),
+          all_day: row[EVENT_COLS.ALL_DAY] === 'TRUE' || row[EVENT_COLS.ALL_DAY] === true,
+          memo: row[EVENT_COLS.MEMO] || null,
+          color_key: row[EVENT_COLS.COLOR_KEY] || 'other'
+        };
+      }
+    }
+
+    return null;
+  } catch (e) {
+    console.error('getEventById error:', e);
+    return null;
+  }
+}
+
 // ===========================================
 // 日本の祝日取得
 // ===========================================

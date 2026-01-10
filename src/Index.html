@@ -775,6 +775,56 @@
     </div>
   </div>
 
+  <!-- 予定編集モーダル -->
+  <div class="modal-overlay" id="eventEditModal">
+    <div class="modal">
+      <div class="modal-title">予定を編集</div>
+      <div class="modal-content">
+        <input type="hidden" id="editEventId">
+        <div class="modal-form-item">
+          <label class="modal-form-label">タイトル</label>
+          <input type="text" class="modal-form-input" id="editEventTitle" placeholder="予定のタイトル">
+        </div>
+        <div class="modal-form-item">
+          <label class="modal-form-label">日付</label>
+          <input type="date" class="modal-form-input" id="editEventDate">
+        </div>
+        <div class="modal-form-row">
+          <div class="modal-form-item" style="flex:1">
+            <label class="modal-form-label">開始時刻</label>
+            <input type="time" class="modal-form-input" id="editEventStartTime">
+          </div>
+          <div class="modal-form-item" style="flex:1">
+            <label class="modal-form-label">終了時刻</label>
+            <input type="time" class="modal-form-input" id="editEventEndTime">
+          </div>
+        </div>
+        <div class="modal-form-item">
+          <label class="modal-form-label">カテゴリ</label>
+          <select class="modal-form-input" id="editEventColorKey">
+            <option value="health">医療・健康</option>
+            <option value="work">仕事</option>
+            <option value="family">家族・人付き合い</option>
+            <option value="finance">お金・手続き</option>
+            <option value="travel">旅行・移動</option>
+            <option value="fun">趣味・娯楽</option>
+            <option value="school">学校・学習</option>
+            <option value="other">その他</option>
+          </select>
+        </div>
+        <div class="modal-form-item">
+          <label class="modal-form-label">メモ</label>
+          <textarea class="modal-form-textarea" id="editEventMemo" placeholder="補足情報（任意）"></textarea>
+        </div>
+      </div>
+      <div class="modal-buttons" style="flex-wrap: wrap; gap: 8px;">
+        <button class="modal-btn modal-btn-cancel" id="eventEditCancel">閉じる</button>
+        <button class="modal-btn" id="eventEditDelete" style="background: #ffcdd2; color: #c62828;">削除</button>
+        <button class="modal-btn modal-btn-confirm" id="eventEditSave">保存</button>
+      </div>
+    </div>
+  </div>
+
   <!-- トースト -->
   <div class="toast" id="toast"></div>
 
@@ -892,6 +942,11 @@
         hideModal('dayDetail');
         document.getElementById('calendarTextInput').focus();
       });
+
+      // 予定編集モーダル
+      document.getElementById('eventEditCancel').addEventListener('click', () => hideModal('eventEdit'));
+      document.getElementById('eventEditSave').addEventListener('click', saveEditedEvent);
+      document.getElementById('eventEditDelete').addEventListener('click', deleteEditedEvent);
 
       // 音声入力（トグル式：タップで開始/停止）
       document.getElementById('calendarMicBtn').addEventListener('click', () => toggleVoiceInput('calendar'));
@@ -1339,8 +1394,9 @@
           const timeStr = evt.start_time ? evt.start_time.substring(0, 5) : '終日';
           const colorKey = evt.color_key || 'other';
           const bgGradient = COLOR_KEY_GRADIENTS[colorKey] || COLOR_KEY_GRADIENTS.other;
+          const eventId = evt.event_id || '';
           contentHtml += `
-            <div style="background: ${bgGradient}; padding: 12px; border-radius: 12px;">
+            <div class="event-bar-clickable" data-event-id="${escapeHtml(eventId)}" style="background: ${bgGradient}; padding: 12px; border-radius: 12px; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s;">
               <div style="font-size: 12px; color: #5c6bc0; font-weight: bold;">${timeStr}</div>
               <div style="font-size: 14px; font-weight: bold; margin-top: 4px;">${escapeHtml(evt.title || '')}</div>
               ${evt.memo ? `<div style="font-size: 12px; color: #666; margin-top: 4px;">${escapeHtml(evt.memo)}</div>` : ''}
@@ -1351,7 +1407,139 @@
       }
 
       document.getElementById('dayDetailContent').innerHTML = contentHtml;
+
+      // 予定バーにクリックイベントを設定
+      document.querySelectorAll('.event-bar-clickable').forEach(bar => {
+        bar.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const eventId = bar.dataset.eventId;
+          if (eventId) {
+            openEventEditModal(eventId);
+          }
+        });
+        // ホバー効果
+        bar.addEventListener('mouseenter', () => {
+          bar.style.transform = 'scale(1.02)';
+          bar.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+        });
+        bar.addEventListener('mouseleave', () => {
+          bar.style.transform = '';
+          bar.style.boxShadow = '';
+        });
+      });
+
       document.getElementById('dayDetailModal').classList.add('show');
+    }
+
+    // ===== 予定編集モーダル =====
+    function openEventEditModal(eventId) {
+      showLoading(true);
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showLoading(false);
+          if (result.success && result.event) {
+            const evt = result.event;
+            document.getElementById('editEventId').value = evt.event_id;
+            document.getElementById('editEventTitle').value = evt.title || '';
+            document.getElementById('editEventDate').value = evt.start_date || '';
+            document.getElementById('editEventStartTime').value = evt.start_time || '';
+            document.getElementById('editEventEndTime').value = evt.end_time || '';
+            document.getElementById('editEventColorKey').value = evt.color_key || 'other';
+            document.getElementById('editEventMemo').value = evt.memo || '';
+
+            // 日付詳細モーダルを閉じて編集モーダルを開く
+            hideModal('dayDetail');
+            document.getElementById('eventEditModal').classList.add('show');
+          } else {
+            showToast('予定の取得に失敗しました');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showLoading(false);
+          console.error('getEventData failed:', error);
+          showToast('予定の取得に失敗しました');
+        })
+        .getEventData(eventId);
+    }
+
+    function saveEditedEvent() {
+      const eventId = document.getElementById('editEventId').value;
+      const title = document.getElementById('editEventTitle').value.trim();
+      const startDate = document.getElementById('editEventDate').value;
+      const startTime = document.getElementById('editEventStartTime').value || null;
+      const endTime = document.getElementById('editEventEndTime').value || null;
+      const colorKey = document.getElementById('editEventColorKey').value;
+      const memo = document.getElementById('editEventMemo').value.trim();
+
+      if (!title) {
+        showToast('タイトルを入力してください');
+        return;
+      }
+      if (!startDate) {
+        showToast('日付を入力してください');
+        return;
+      }
+
+      const payload = {
+        event_id: eventId,
+        title: title,
+        start_date: startDate,
+        end_date: startDate,  // 単日予定として扱う
+        start_time: startTime,
+        end_time: endTime,
+        all_day: !startTime,
+        color_key: colorKey,
+        memo: memo || null
+      };
+
+      showLoading(true);
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showLoading(false);
+          if (result.success) {
+            showToast(result.message || '予定を更新しました');
+            hideModal('eventEdit');
+            // カレンダーを再読み込み
+            loadCalendarDataSafe();
+          } else {
+            showToast('エラー: ' + (result.error || '更新に失敗しました'));
+          }
+        })
+        .withFailureHandler(function(error) {
+          showLoading(false);
+          console.error('updateEventData failed:', error);
+          showToast('更新に失敗しました');
+        })
+        .updateEventData(payload);
+    }
+
+    function deleteEditedEvent() {
+      const eventId = document.getElementById('editEventId').value;
+      const title = document.getElementById('editEventTitle').value;
+
+      if (!confirm(`予定「${title}」を削除しますか？`)) {
+        return;
+      }
+
+      showLoading(true);
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showLoading(false);
+          if (result.success) {
+            showToast(result.message || '予定を削除しました');
+            hideModal('eventEdit');
+            // カレンダーを再読み込み
+            loadCalendarDataSafe();
+          } else {
+            showToast('エラー: ' + (result.error || '削除に失敗しました'));
+          }
+        })
+        .withFailureHandler(function(error) {
+          showLoading(false);
+          console.error('deleteEventData failed:', error);
+          showToast('削除に失敗しました');
+        })
+        .deleteEventData(eventId);
     }
 
     function confirmCalendarEvent() {
