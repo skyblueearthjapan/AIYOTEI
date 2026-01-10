@@ -835,7 +835,19 @@
         .withSuccessHandler(function(data) {
           __calendarLoading = false;
           __calendarRetry = 0; // 成功でリトライリセット
-          state.calendarData = data;
+
+          // デバッグ用ログ
+          console.log('getCalendarData response:', data);
+          console.log('events:', data?.events);
+          console.log('rokuyo:', data?.rokuyo);
+
+          // dataがnullの場合のフォールバック
+          state.calendarData = data || { events: {}, rokuyo: {} };
+
+          // eventsやrokuyoがnullの場合も安全に処理
+          if (!state.calendarData.events) state.calendarData.events = {};
+          if (!state.calendarData.rokuyo) state.calendarData.rokuyo = {};
+
           renderCalendar();
           showLoading(false);
         })
