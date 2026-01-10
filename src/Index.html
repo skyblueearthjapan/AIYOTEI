@@ -1445,7 +1445,7 @@
 
       // バージョンをインクリメント
       const saveVersion = ++state.memoVersion;
-      const normalized = normalizeToBullets(currentText, { splitByPeriod: true });
+      const normalized = normalizeMemoText(currentText);
 
       showSyncStatus('syncing', 'メモ保存中...');
 
@@ -1471,60 +1471,23 @@
         .saveMemo(state.memoDate, normalized);
     }
 
-    // 黒丸（•）自動変換関数
-    function normalizeToBullets(text, opts = { splitByPeriod: true }) {
+    // メモテキスト整形（黒点は付けない、改行だけ整える）
+    function normalizeMemoText(text) {
       if (!text) return '';
 
-      // 改行を統一
-      let t = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      // 前後の空白を整え、改行を統一
+      let t = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
 
-      // 句点で分割（長文1行を分割する）
-      if (opts.splitByPeriod) {
-        const lines = t.split('\n');
-        const expanded = [];
-        for (const line of lines) {
-          const trimmed = line.trim();
-          // すでに箇条書きっぽい行はそのまま
-          if (/^([•\u2022\-\*・]|(\d+[\.\)]))\s*/.test(trimmed)) {
-            expanded.push(line);
-            continue;
-          }
-          // 句点が複数あり、長い行のときだけ分割
-          if (trimmed && trimmed.includes('。') && trimmed.length > 30) {
-            const parts = trimmed.split('。').map(s => s.trim()).filter(Boolean);
-            for (const p of parts) expanded.push(p + '。');
-          } else {
-            expanded.push(line);
-          }
-        }
-        t = expanded.join('\n');
-      }
+      // 連続しすぎる空行だけ抑える（3行以上→2行まで）
+      t = t.replace(/\n{3,}/g, '\n\n');
 
-      // 行ごとに「• 」へ整形
-      const lines2 = t.split('\n');
-      const out = lines2.map((line) => {
-        const s = line.trim();
-        if (!s) return ''; // 空行は維持
-
-        // 既存の箇条書き記号や番号を検出
-        const m = s.match(/^([•\u2022\-\*・]|(\d+[\.\)]))\s*(.*)$/);
-        if (m) {
-          const body = (m[3] || '').trim();
-          return body ? '• ' + body : '';
-        }
-
-        // 通常行は先頭に • を付与
-        return '• ' + s;
-      });
-
-      // 連続する空行は最大2行まで
-      return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+      return t;
     }
 
     function saveMemoText() {
       const el = document.getElementById('memoText');
-      // 保存前に黒丸自動変換
-      const normalized = normalizeToBullets(el.value, { splitByPeriod: true });
+      // 整形（黒点は付けない）
+      const normalized = normalizeMemoText(el.value);
       el.value = normalized;  // UI上も整った形にする
 
       showLoading(true);
