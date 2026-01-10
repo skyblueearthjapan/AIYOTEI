@@ -89,8 +89,19 @@ const CALENDAR_SYSTEM_PROMPT = `あなたは日本語の音声入力テキスト
   "start_time": "HH:MM または null",
   "end_time": "HH:MM または null",
   "all_day": true または false,
-  "memo": "補足情報 または null"
+  "memo": "補足情報 または null",
+  "color_key": "カテゴリ（下記参照）"
 }
+
+## color_key カテゴリ一覧（必ずこの中から1つ選ぶ）
+- health: 医療・健康（病院、歯医者、検診、薬局、ジム、運動、美容院など）
+- work: 仕事（会議、打ち合わせ、出張、面接、仕事関連全般）
+- family: 家族・人付き合い（家族行事、友人、デート、結婚式、お見舞いなど）
+- finance: お金・手続き（銀行、役所、保険、税金、契約、支払いなど）
+- travel: 旅行・移動（旅行、帰省、引越し、送迎など）
+- fun: 趣味・娯楽（映画、コンサート、スポーツ観戦、飲み会、イベント、ライブなど）
+- school: 学校・学習（授業、試験、塾、習い事、PTA、学校行事など）
+- other: その他（上記に当てはまらない場合）
 
 ## ルール
 1. titleは必ず抽出する。不明な場合は「予定」などの代替を入れる
@@ -100,6 +111,7 @@ const CALENDAR_SYSTEM_PROMPT = `あなたは日本語の音声入力テキスト
 5. 終日予定の場合は all_day: true
 6. 「持っていく」「準備する」などの補足はmemoに入れる
 7. 今日の日付は {{TODAY}} として参照可能
+8. color_keyは内容から最も適切なカテゴリを1つ選ぶ
 
 ## 注意
 - JSONのみを出力し、説明文は付けない
@@ -211,6 +223,12 @@ function validateCalendarData(data, rawText) {
   // all_dayのデフォルト
   if (typeof data.all_day !== 'boolean') {
     data.all_day = !data.start_time;
+  }
+
+  // color_keyのバリデーション（許可されたカテゴリのみ）
+  const validColorKeys = ['health', 'work', 'family', 'finance', 'travel', 'fun', 'school', 'other'];
+  if (!data.color_key || !validColorKeys.includes(data.color_key)) {
+    data.color_key = 'other';
   }
 }
 

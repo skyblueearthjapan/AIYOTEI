@@ -20,7 +20,8 @@ const EVENT_COLS = {
   ALL_DAY: 10,      // K: all_day
   MEMO: 11,         // L: memo
   STATUS: 12,       // M: status
-  LAST_AI_MODEL: 13 // N: last_ai_model
+  LAST_AI_MODEL: 13,// N: last_ai_model
+  COLOR_KEY: 14     // O: color_key (health, work, family, finance, travel, fun, school, other)
 };
 
 // ===========================================
@@ -63,7 +64,7 @@ function insertEventToDB(eventData, rawText, source = 'text') {
  * @returns {Array} 行データ配列
  */
 function createEventRow(eventData, rawText, source, model) {
-  const row = new Array(14).fill('');
+  const row = new Array(15).fill('');
 
   row[EVENT_COLS.EVENT_ID] = newEventId();
   row[EVENT_COLS.CREATED_AT] = getCurrentDateTime();
@@ -79,6 +80,7 @@ function createEventRow(eventData, rawText, source, model) {
   row[EVENT_COLS.MEMO] = eventData.memo || '';
   row[EVENT_COLS.STATUS] = 'active';
   row[EVENT_COLS.LAST_AI_MODEL] = model;
+  row[EVENT_COLS.COLOR_KEY] = eventData.color_key || 'other';
 
   return row;
 }
@@ -118,7 +120,8 @@ function getEventsByDate(dateStr) {
         start_time: formatTimeValue(row[EVENT_COLS.START_TIME], tz),
         end_time: formatTimeValue(row[EVENT_COLS.END_TIME], tz),
         all_day: row[EVENT_COLS.ALL_DAY] === 'TRUE' || row[EVENT_COLS.ALL_DAY] === true,
-        memo: row[EVENT_COLS.MEMO] || null
+        memo: row[EVENT_COLS.MEMO] || null,
+        color_key: row[EVENT_COLS.COLOR_KEY] || 'other'
       });
     }
   }
@@ -211,7 +214,8 @@ function getEventsByMonth(year, month) {
         title: row[EVENT_COLS.TITLE],
         start_date: startDate,
         end_date: endDate,
-        start_time: formatTimeValue(row[EVENT_COLS.START_TIME], tz)
+        start_time: formatTimeValue(row[EVENT_COLS.START_TIME], tz),
+        color_key: row[EVENT_COLS.COLOR_KEY] || 'other'
       };
 
       // イベントが含まれる各日に追加
@@ -265,4 +269,49 @@ function updateEventStatus(eventId, newStatus) {
  */
 function deleteEvent(eventId) {
   return updateEventStatus(eventId, 'deleted');
+}
+
+// ===========================================
+// 日本の祝日取得
+// ===========================================
+
+/**
+ * 指定月の日本の祝日を取得
+ * @param {number} year - 年
+ * @param {number} month - 月（1-12）
+ * @returns {Object} 日付をキーとした祝日名のマップ { "2026-01-01": "元日", ... }
+ */
+function getHolidaysByMonth(year, month) {
+  const holidayMap = {};
+  const tz = getSettings().timezone;
+
+  try {
+    // 日本の祝日カレンダーID
+    const calendarId = 'ja.japanese#holiday@group.v.calendar.google.com';
+    const calendar = CalendarApp.getCalendarById(calendarId);
+
+    if (!calendar) {
+      console.warn('Japanese holiday calendar not found');
+      return holidayMap;
+    }
+
+    // 月の範囲
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    // 祝日イベントを取得
+    const events = calendar.getEvents(startDate, endDate);
+
+    events.forEach(event => {
+      const eventDate = event.getStartTime();
+      const dateKey = Utilities.formatDate(eventDate, tz, 'yyyy-MM-dd');
+      const title = event.getTitle();
+      holidayMap[dateKey] = title;
+    });
+
+  } catch (e) {
+    console.error('getHolidaysByMonth error:', e);
+  }
+
+  return holidayMap;
 }

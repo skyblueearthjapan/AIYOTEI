@@ -309,6 +309,46 @@
       text-align: center;
     }
 
+    /* ===== 土日・祝日の背景色 ===== */
+    .calendar-day.is-sat {
+      background: #fffde7; /* 薄い黄色 */
+    }
+    .calendar-day.is-sun,
+    .calendar-day.is-holiday {
+      background: #fff0f3; /* 薄いピンク */
+    }
+    .calendar-day.is-sat.today,
+    .calendar-day.is-sun.today,
+    .calendar-day.is-holiday.today {
+      background: linear-gradient(135deg, #fff8e1 50%, #fff0f3 50%);
+    }
+
+    /* ===== イベント色（カテゴリ別） ===== */
+    .day-event.event-color-health {
+      background: linear-gradient(135deg, #ffcdd2 0%, #f8bbd9 100%);
+    }
+    .day-event.event-color-work {
+      background: linear-gradient(135deg, #bbdefb 0%, #90caf9 100%);
+    }
+    .day-event.event-color-family {
+      background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
+    }
+    .day-event.event-color-finance {
+      background: linear-gradient(135deg, #fff9c4 0%, #fff59d 100%);
+    }
+    .day-event.event-color-travel {
+      background: linear-gradient(135deg, #b2ebf2 0%, #80deea 100%);
+    }
+    .day-event.event-color-fun {
+      background: linear-gradient(135deg, #e1bee7 0%, #ce93d8 100%);
+    }
+    .day-event.event-color-school {
+      background: linear-gradient(135deg, #ffe0b2 0%, #ffcc80 100%);
+    }
+    .day-event.event-color-other {
+      background: linear-gradient(135deg, #cfd8dc 0%, #b0bec5 100%);
+    }
+
     /* ===== メモページ ===== */
     .memo-date-nav {
       display: flex;
@@ -751,7 +791,7 @@
       currentMonth: null,
       selectedDate: null,
       memoDate: null,
-      calendarData: { events: {}, rokuyo: {} },
+      calendarData: { events: {}, rokuyo: {}, holidays: {} },
       pendingEventData: null,
       pendingMemoText: null,
       pendingMemoRaw: null,
@@ -892,11 +932,12 @@
           console.log('rokuyo:', data?.rokuyo);
 
           // dataがnullの場合のフォールバック
-          state.calendarData = data || { events: {}, rokuyo: {} };
+          state.calendarData = data || { events: {}, rokuyo: {}, holidays: {} };
 
           // eventsやrokuyoがnullの場合も安全に処理
           if (!state.calendarData.events) state.calendarData.events = {};
           if (!state.calendarData.rokuyo) state.calendarData.rokuyo = {};
+          if (!state.calendarData.holidays) state.calendarData.holidays = {};
 
           renderCalendar();
           showLoading(false);
@@ -982,6 +1023,16 @@
       if (isOtherMonth) cell.classList.add('other-month');
 
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dateObj = new Date(year, month - 1, day);
+      const dayOfWeek = dateObj.getDay(); // 0=日, 6=土
+
+      // 土曜・日曜のクラス
+      if (dayOfWeek === 0) cell.classList.add('is-sun');
+      if (dayOfWeek === 6) cell.classList.add('is-sat');
+
+      // 祝日チェック（holidayMapがあれば）
+      const holidayName = state.calendarData?.holidays?.[dateStr];
+      if (holidayName) cell.classList.add('is-holiday');
 
       if (dateStr === state.today) cell.classList.add('today');
       if (dateStr === state.selectedDate) cell.classList.add('selected');
@@ -1002,20 +1053,25 @@
       }
 
       // イベント（安全なnullガード付き）
+      const MAX_EVENTS_PER_DAY = 3;
       const dayEvents = state.calendarData?.events?.[dateStr];
       if (dayEvents && dayEvents.length > 0) {
         const eventsDiv = document.createElement('div');
         eventsDiv.className = 'day-events';
-        dayEvents.slice(0, 2).forEach(evt => {
+        dayEvents.slice(0, MAX_EVENTS_PER_DAY).forEach(evt => {
           const eventEl = document.createElement('div');
           eventEl.className = 'day-event';
+          // color_keyがあれば対応するクラスを付与
+          if (evt?.color_key) {
+            eventEl.classList.add('event-color-' + evt.color_key);
+          }
           eventEl.textContent = evt?.title ?? '';
           eventsDiv.appendChild(eventEl);
         });
-        if (dayEvents.length > 2) {
+        if (dayEvents.length > MAX_EVENTS_PER_DAY) {
           const more = document.createElement('div');
           more.className = 'day-event-more';
-          more.textContent = `+${dayEvents.length - 2}件`;
+          more.textContent = `+${dayEvents.length - MAX_EVENTS_PER_DAY}件`;
           eventsDiv.appendChild(more);
         }
         cell.appendChild(eventsDiv);
@@ -1244,6 +1300,18 @@
     }
 
     // ===== 日付詳細モーダル =====
+    // color_key → グラデーション背景のマップ
+    const COLOR_KEY_GRADIENTS = {
+      health: 'linear-gradient(135deg, #ffcdd2 0%, #f8bbd9 100%)',
+      work: 'linear-gradient(135deg, #bbdefb 0%, #90caf9 100%)',
+      family: 'linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%)',
+      finance: 'linear-gradient(135deg, #fff9c4 0%, #fff59d 100%)',
+      travel: 'linear-gradient(135deg, #b2ebf2 0%, #80deea 100%)',
+      fun: 'linear-gradient(135deg, #e1bee7 0%, #ce93d8 100%)',
+      school: 'linear-gradient(135deg, #ffe0b2 0%, #ffcc80 100%)',
+      other: 'linear-gradient(135deg, #cfd8dc 0%, #b0bec5 100%)'
+    };
+
     function openDayDetailModal(dateStr) {
       const d = new Date(dateStr);
       const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
@@ -1253,15 +1321,26 @@
       // その日の予定を取得
       const dayEvents = state.calendarData?.events?.[dateStr] || [];
 
+      // 祝日情報を取得
+      const holidayName = state.calendarData?.holidays?.[dateStr];
+
       let contentHtml = '';
+
+      // 祝日表示
+      if (holidayName) {
+        contentHtml += `<div style="background: #fff0f3; color: #e57373; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; text-align: center; font-weight: bold;">🎌 ${escapeHtml(holidayName)}</div>`;
+      }
+
       if (dayEvents.length === 0) {
-        contentHtml = '<div style="text-align: center; color: #888; padding: 20px;">予定がありません</div>';
+        contentHtml += '<div style="text-align: center; color: #888; padding: 20px;">予定がありません</div>';
       } else {
-        contentHtml = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+        contentHtml += '<div style="display: flex; flex-direction: column; gap: 12px;">';
         dayEvents.forEach(evt => {
           const timeStr = evt.start_time ? evt.start_time.substring(0, 5) : '終日';
+          const colorKey = evt.color_key || 'other';
+          const bgGradient = COLOR_KEY_GRADIENTS[colorKey] || COLOR_KEY_GRADIENTS.other;
           contentHtml += `
-            <div style="background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 100%); padding: 12px; border-radius: 12px;">
+            <div style="background: ${bgGradient}; padding: 12px; border-radius: 12px;">
               <div style="font-size: 12px; color: #5c6bc0; font-weight: bold;">${timeStr}</div>
               <div style="font-size: 14px; font-weight: bold; margin-top: 4px;">${escapeHtml(evt.title || '')}</div>
               ${evt.memo ? `<div style="font-size: 12px; color: #666; margin-top: 4px;">${escapeHtml(evt.memo)}</div>` : ''}

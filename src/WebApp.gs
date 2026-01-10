@@ -83,15 +83,24 @@ function getCalendarData(year, month) {
       console.error('getRokuyoByMonth error:', e);
     }
 
+    // 祝日取得（失敗したら空オブジェクト）
+    let holidays = {};
+    try {
+      holidays = getHolidaysByMonth(y, m) || {};
+    } catch (e) {
+      console.error('getHolidaysByMonth error:', e);
+    }
+
     console.log('getCalendarData returning events count:', Object.keys(events).length);
 
-    // 必ず events/rokuyo キーで返す（nullは禁止）
+    // 必ず events/rokuyo/holidays キーで返す（nullは禁止）
     // JSON.parse(JSON.stringify()) で Date オブジェクトを確実に文字列化
     const result = {
       year: y,
       month: m,
       events: events,
-      rokuyo: rokuyo
+      rokuyo: rokuyo,
+      holidays: holidays
     };
     return JSON.parse(JSON.stringify(result));
   } catch (e) {
@@ -101,7 +110,8 @@ function getCalendarData(year, month) {
       year: year || new Date().getFullYear(),
       month: month || new Date().getMonth() + 1,
       events: {},
-      rokuyo: {}
+      rokuyo: {},
+      holidays: {}
     };
   }
 }
