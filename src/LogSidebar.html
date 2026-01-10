@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
+      margin: 0;
+      padding: 16px;
+      background-color: #faf8f5;
+      color: #333;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .title {
+      font-size: 16px;
+      font-weight: bold;
+      color: #5c6bc0;
+    }
+
+    .btn-refresh {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 16px;
+      background-color: #f5f5f5;
+      color: #666;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .btn-refresh:hover {
+      background-color: #e8e8e8;
+    }
+
+    .log-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .log-item {
+      background-color: #fff;
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .log-page {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+
+    .log-page.calendar {
+      background-color: #e3f2fd;
+      color: #1976d2;
+    }
+
+    .log-page.memo {
+      background-color: #f3e5f5;
+      color: #7b1fa2;
+    }
+
+    .log-result {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .log-result.success {
+      background-color: #e8f5e9;
+      color: #388e3c;
+    }
+
+    .log-result.fail {
+      background-color: #ffebee;
+      color: #d32f2f;
+    }
+
+    .log-action {
+      font-size: 13px;
+      color: #333;
+      margin-bottom: 4px;
+    }
+
+    .log-timestamp {
+      font-size: 11px;
+      color: #888;
+    }
+
+    .log-error {
+      font-size: 11px;
+      color: #d32f2f;
+      margin-top: 8px;
+      padding: 8px;
+      background-color: #ffebee;
+      border-radius: 8px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #888;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px 20px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">操作ログ</div>
+    <button class="btn-refresh" onclick="refreshLogs()">更新</button>
+  </div>
+
+  <div id="logContainer" class="log-list">
+    <div class="loading">読み込み中...</div>
+  </div>
+
+  <script>
+    // 初期読み込み
+    document.addEventListener('DOMContentLoaded', function() {
+      refreshLogs();
+    });
+
+    // ログを更新
+    function refreshLogs() {
+      document.getElementById('logContainer').innerHTML = '<div class="loading">読み込み中...</div>';
+
+      google.script.run
+        .withSuccessHandler(function(logs) {
+          renderLogs(logs);
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('logContainer').innerHTML =
+            '<div class="empty-state">読み込みエラー: ' + error.message + '</div>';
+        })
+        .getRecentLogs(20);
+    }
+
+    // ログを描画
+    function renderLogs(logs) {
+      const container = document.getElementById('logContainer');
+
+      if (!logs || logs.length === 0) {
+        container.innerHTML = '<div class="empty-state">ログがありません</div>';
+        return;
+      }
+
+      let html = '';
+      logs.forEach(function(log) {
+        const pageClass = log.page === 'calendar' ? 'calendar' : 'memo';
+        const resultClass = log.result === 'success' ? 'success' : 'fail';
+        const resultText = log.result === 'success' ? '成功' : '失敗';
+
+        html += '<div class="log-item">';
+        html += '  <div class="log-header">';
+        html += '    <span class="log-page ' + pageClass + '">' + (log.page || '-') + '</span>';
+        html += '    <span class="log-result ' + resultClass + '">' + resultText + '</span>';
+        html += '  </div>';
+        html += '  <div class="log-action">' + formatAction(log.action) + '</div>';
+        html += '  <div class="log-timestamp">' + (log.timestamp || '-') + '</div>';
+
+        if (log.error_message) {
+          html += '  <div class="log-error">' + escapeHtml(log.error_message) + '</div>';
+        }
+
+        html += '</div>';
+      });
+
+      container.innerHTML = html;
+    }
+
+    // アクション名をフォーマット
+    function formatAction(action) {
+      const actionMap = {
+        'insert_event': '予定を登録',
+        'append_memo': 'メモを追記',
+        'update_event': '予定を更新',
+        'delete_event': '予定を削除'
+      };
+      return actionMap[action] || action || '-';
+    }
+
+    // HTMLエスケープ
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>

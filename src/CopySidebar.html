@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
+      margin: 0;
+      padding: 16px;
+      background-color: #faf8f5;
+      color: #333;
+    }
+
+    .header {
+      margin-bottom: 16px;
+    }
+
+    .date-label {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+
+    .date-value {
+      font-size: 18px;
+      font-weight: bold;
+      color: #5c6bc0;
+    }
+
+    .memo-container {
+      margin-bottom: 16px;
+    }
+
+    .memo-label {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+
+    .memo-text {
+      width: 100%;
+      min-height: 200px;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      background-color: #fff;
+      font-size: 14px;
+      line-height: 1.6;
+      resize: vertical;
+      font-family: inherit;
+    }
+
+    .memo-text:focus {
+      outline: none;
+      border-color: #5c6bc0;
+      box-shadow: 0 0 0 2px rgba(92, 107, 192, 0.2);
+    }
+
+    .button-container {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 24px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #7986cb, #5c6bc0);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #5c6bc0, #3f51b5);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background-color: #f5f5f5;
+      color: #666;
+    }
+
+    .btn-secondary:hover {
+      background-color: #e8e8e8;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #333;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 24px;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 1000;
+    }
+
+    .toast.show {
+      opacity: 1;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #888;
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="date-label">日付</div>
+    <div class="date-value" id="currentDate">読み込み中...</div>
+  </div>
+
+  <div class="memo-container">
+    <div class="memo-label">メモ本文</div>
+    <textarea class="memo-text" id="memoText" placeholder="メモがありません"></textarea>
+  </div>
+
+  <div class="button-container">
+    <button class="btn btn-primary" onclick="copyToClipboard()">
+      コピー
+    </button>
+    <button class="btn btn-secondary" onclick="refreshMemo()">
+      更新
+    </button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // 初期読み込み
+    document.addEventListener('DOMContentLoaded', function() {
+      refreshMemo();
+    });
+
+    // メモを更新
+    function refreshMemo() {
+      google.script.run
+        .withSuccessHandler(function(data) {
+          document.getElementById('currentDate').textContent = data.date || '-';
+          document.getElementById('memoText').value = data.text || '';
+        })
+        .withFailureHandler(function(error) {
+          showToast('読み込みエラー: ' + error.message);
+        })
+        .getCurrentMemoForSidebar();
+    }
+
+    // クリップボードにコピー
+    function copyToClipboard() {
+      const memoText = document.getElementById('memoText').value;
+
+      if (!memoText) {
+        showToast('コピーするメモがありません');
+        return;
+      }
+
+      navigator.clipboard.writeText(memoText)
+        .then(function() {
+          showToast('コピーしました');
+        })
+        .catch(function(err) {
+          // フォールバック: 選択してコピー
+          const textarea = document.getElementById('memoText');
+          textarea.select();
+          document.execCommand('copy');
+          showToast('コピーしました');
+        });
+    }
+
+    // トースト表示
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+
+      setTimeout(function() {
+        toast.classList.remove('show');
+      }, 2000);
+    }
+  </script>
+</body>
+</html>
