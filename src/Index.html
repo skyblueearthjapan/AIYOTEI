@@ -383,19 +383,24 @@
 
     .memo-text {
       width: 100%;
-      min-height: 200px;
+      height: calc(100vh - 380px);
+      min-height: 280px;
+      max-height: 500px;
       padding: 16px;
       border: 2px solid #f0f0f0;
-      border-radius: 12px;
-      font-size: 14px;
+      border-radius: 16px;
+      font-size: 15px;
       line-height: 1.8;
-      resize: vertical;
+      resize: none;
       outline: none;
       font-family: inherit;
+      background: rgba(255,255,255,0.95);
+      box-sizing: border-box;
     }
 
     .memo-text:focus {
-      border-color: #5c6bc0;
+      border-color: rgba(93, 112, 201, 0.5);
+      box-shadow: 0 0 0 4px rgba(93, 112, 201, 0.1);
     }
 
     /* ===== 確認モーダル ===== */
@@ -1090,8 +1095,62 @@
       document.getElementById('saveMemoBtn').disabled = !isDirty;
     }
 
+    // 黒丸（•）自動変換関数
+    function normalizeToBullets(text, opts = { splitByPeriod: true }) {
+      if (!text) return '';
+
+      // 改行を統一
+      let t = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+      // 句点で分割（長文1行を分割する）
+      if (opts.splitByPeriod) {
+        const lines = t.split('\n');
+        const expanded = [];
+        for (const line of lines) {
+          const trimmed = line.trim();
+          // すでに箇条書きっぽい行はそのまま
+          if (/^([•\u2022\-\*・]|(\d+[\.\)]))\s*/.test(trimmed)) {
+            expanded.push(line);
+            continue;
+          }
+          // 句点が複数あり、長い行のときだけ分割
+          if (trimmed && trimmed.includes('。') && trimmed.length > 30) {
+            const parts = trimmed.split('。').map(s => s.trim()).filter(Boolean);
+            for (const p of parts) expanded.push(p + '。');
+          } else {
+            expanded.push(line);
+          }
+        }
+        t = expanded.join('\n');
+      }
+
+      // 行ごとに「• 」へ整形
+      const lines2 = t.split('\n');
+      const out = lines2.map((line) => {
+        const s = line.trim();
+        if (!s) return ''; // 空行は維持
+
+        // 既存の箇条書き記号や番号を検出
+        const m = s.match(/^([•\u2022\-\*・]|(\d+[\.\)]))\s*(.*)$/);
+        if (m) {
+          const body = (m[3] || '').trim();
+          return body ? '• ' + body : '';
+        }
+
+        // 通常行は先頭に • を付与
+        return '• ' + s;
+      });
+
+      // 連続する空行は最大2行まで
+      return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    }
+
     function saveMemoText() {
-      const text = document.getElementById('memoText').value;
+      const el = document.getElementById('memoText');
+      // 保存前に黒丸自動変換
+      const normalized = normalizeToBullets(el.value, { splitByPeriod: true });
+      el.value = normalized;  // UI上も整った形にする
+
       showLoading(true);
 
       google.script.run
@@ -1099,7 +1158,7 @@
           showLoading(false);
           if (result.success) {
             showToast(result.message);
-            state.memoOriginalText = text;  // 保存後に原本を更新
+            state.memoOriginalText = normalized;  // 保存後に原本を更新
             updateSaveButtonState();  // ボタン状態を更新
           } else {
             showToast('エラー: ' + result.error);
@@ -1110,7 +1169,7 @@
           console.error('saveMemo failed:', error);
           showToast('保存に失敗しました');
         })
-        .saveMemo(state.memoDate, text);
+        .saveMemo(state.memoDate, normalized);
     }
 
     // ===== 入力処理 =====
