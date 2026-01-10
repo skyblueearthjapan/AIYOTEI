@@ -744,13 +744,23 @@
     let __lastRenderKey = ''; // 同一月の再レンダー防止
 
     // ===== 初期化 =====
+    let __initCalled = false;
     document.addEventListener('DOMContentLoaded', init);
 
     function init() {
+      // 二重初期化防止
+      if (__initCalled) {
+        console.warn('init() already called, skipping');
+        return;
+      }
+      __initCalled = true;
+      console.log('init() starting...');
+
       // 初期データ取得
       showLoading(true);
       google.script.run
         .withSuccessHandler(function(data) {
+          console.log('getInitialData success:', data);
           state.today = data.today;
           state.currentYear = data.year;
           state.currentMonth = data.month;
@@ -761,7 +771,11 @@
           loadCalendarDataSafe();
           loadMemoDataSafe();
         })
-        .withFailureHandler(handleError)
+        .withFailureHandler(function(error) {
+          console.error('getInitialData failed:', error);
+          showLoading(false);
+          showToast('初期化エラー。ページを再読み込みしてください。');
+        })
         .getInitialData();
 
       // イベントリスナー設定
