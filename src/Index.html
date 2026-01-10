@@ -215,14 +215,17 @@
     .calendar-grid {
       background: white;
       border-radius: 16px;
-      overflow: hidden;
       box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
     }
 
     .calendar-weekdays {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
       background: #f8f8f8;
+      min-width: 320px;
     }
 
     .weekday {
@@ -239,6 +242,7 @@
     .calendar-days {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
+      min-width: 320px;
     }
 
     .calendar-day {
@@ -247,6 +251,7 @@
       border-top: 1px solid #f0f0f0;
       cursor: pointer;
       transition: background 0.2s;
+      overflow: hidden;
     }
 
     .calendar-day:hover {
@@ -282,9 +287,12 @@
 
     .day-events {
       font-size: 9px;
+      overflow: hidden;
     }
 
     .day-event {
+      display: block;
+      max-width: 100%;
       background: linear-gradient(135deg, #c5cae9 0%, #b3e5fc 100%);
       color: #333;
       padding: 1px 4px;
@@ -293,6 +301,12 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    .day-event-more {
+      font-size: 8px;
+      color: #666;
+      text-align: center;
     }
 
     /* ===== メモページ ===== */
@@ -899,7 +913,7 @@
         });
         if (state.calendarData.events[dateStr].length > 2) {
           const more = document.createElement('div');
-          more.className = 'day-event';
+          more.className = 'day-event-more';
           more.textContent = `+${state.calendarData.events[dateStr].length - 2}件`;
           eventsDiv.appendChild(more);
         }
