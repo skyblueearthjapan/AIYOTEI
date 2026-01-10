@@ -468,6 +468,57 @@
       color: white;
     }
 
+    /* ===== モーダルフォーム ===== */
+    .modal-form-item {
+      margin-bottom: 16px;
+    }
+
+    .modal-form-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .modal-form-label {
+      display: block;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+
+    .modal-form-input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+
+    .modal-form-input:focus {
+      border-color: #5c6bc0;
+    }
+
+    .modal-form-textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+      min-height: 80px;
+      resize: vertical;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+
+    .modal-form-textarea:focus {
+      border-color: #5c6bc0;
+    }
+
     /* ===== トースト ===== */
     .toast {
       position: fixed;
@@ -601,11 +652,34 @@
     </div>
   </div>
 
-  <!-- 確認モーダル（カレンダー用） -->
+  <!-- 確認モーダル（カレンダー用・編集可能） -->
   <div class="modal-overlay" id="calendarModal">
     <div class="modal">
-      <div class="modal-title">予定を登録しますか？</div>
-      <div class="modal-content" id="calendarModalContent"></div>
+      <div class="modal-title">予定を登録</div>
+      <div class="modal-content">
+        <div class="modal-form-item">
+          <label class="modal-form-label">タイトル</label>
+          <input type="text" class="modal-form-input" id="modalEventTitle" placeholder="予定のタイトル">
+        </div>
+        <div class="modal-form-item">
+          <label class="modal-form-label">日付</label>
+          <input type="date" class="modal-form-input" id="modalEventDate">
+        </div>
+        <div class="modal-form-row">
+          <div class="modal-form-item" style="flex:1">
+            <label class="modal-form-label">開始時刻</label>
+            <input type="time" class="modal-form-input" id="modalEventStartTime">
+          </div>
+          <div class="modal-form-item" style="flex:1">
+            <label class="modal-form-label">終了時刻</label>
+            <input type="time" class="modal-form-input" id="modalEventEndTime">
+          </div>
+        </div>
+        <div class="modal-form-item">
+          <label class="modal-form-label">メモ</label>
+          <textarea class="modal-form-textarea" id="modalEventMemo" placeholder="補足情報（任意）"></textarea>
+        </div>
+      </div>
       <div class="modal-buttons">
         <button class="modal-btn modal-btn-cancel" id="calendarModalCancel">キャンセル</button>
         <button class="modal-btn modal-btn-confirm" id="calendarModalConfirm">登録</button>
@@ -707,9 +781,9 @@
       document.getElementById('memoModalCancel').addEventListener('click', () => hideModal('memo'));
       document.getElementById('memoModalConfirm').addEventListener('click', confirmMemoAppend);
 
-      // 音声入力
-      document.getElementById('calendarMicBtn').addEventListener('click', () => startVoiceInput('calendar'));
-      document.getElementById('memoMicBtn').addEventListener('click', () => startVoiceInput('memo'));
+      // 音声入力（トグル式：タップで開始/停止）
+      document.getElementById('calendarMicBtn').addEventListener('click', () => toggleVoiceInput('calendar'));
+      document.getElementById('memoMicBtn').addEventListener('click', () => toggleVoiceInput('memo'));
     }
 
     // ===== タブ切り替え =====
@@ -928,16 +1002,13 @@
 
     // ===== モーダル =====
     function showCalendarModal(data) {
-      let html = '';
-      html += createModalItem('タイトル', data.title);
-      html += createModalItem('日付', data.start_date + (data.start_date !== data.end_date ? ' 〜 ' + data.end_date : ''));
-      if (data.start_time) {
-        html += createModalItem('時間', data.start_time + (data.end_time ? ' 〜 ' + data.end_time : ''));
-      }
-      if (data.memo) {
-        html += createModalItem('メモ', data.memo);
-      }
-      document.getElementById('calendarModalContent').innerHTML = html;
+      // フォームにAI解析結果を初期値としてセット
+      document.getElementById('modalEventTitle').value = data.title || '';
+      document.getElementById('modalEventDate').value = data.start_date || state.selectedDate || '';
+      document.getElementById('modalEventStartTime').value = data.start_time || '';
+      document.getElementById('modalEventEndTime').value = data.end_time || '';
+      document.getElementById('modalEventMemo').value = data.memo || '';
+
       document.getElementById('calendarModal').classList.add('show');
     }
 
@@ -958,9 +1029,33 @@
     }
 
     function confirmCalendarEvent() {
+      // フォームから現在の値を取得
+      const eventData = {
+        title: document.getElementById('modalEventTitle').value.trim(),
+        start_date: document.getElementById('modalEventDate').value,
+        end_date: document.getElementById('modalEventDate').value,
+        start_time: document.getElementById('modalEventStartTime').value || null,
+        end_time: document.getElementById('modalEventEndTime').value || null,
+        memo: document.getElementById('modalEventMemo').value.trim() || null,
+        all_day: !document.getElementById('modalEventStartTime').value
+      };
+
+      // タイトル必須チェック
+      if (!eventData.title) {
+        showToast('タイトルを入力してください');
+        return;
+      }
+
+      // 日付必須チェック
+      if (!eventData.start_date) {
+        showToast('日付を入力してください');
+        return;
+      }
+
       hideModal('calendar');
       showLoading(true);
 
+      // フォームの値でイベントを直接登録
       google.script.run
         .withSuccessHandler(function(result) {
           showLoading(false);
@@ -973,7 +1068,7 @@
           }
         })
         .withFailureHandler(handleError)
-        .registerEvent(state.pendingEventRaw, 'text');
+        .registerEventDirect(eventData, state.pendingEventRaw || '');
     }
 
     function confirmMemoAppend() {
@@ -995,8 +1090,21 @@
         .addMemo(state.memoDate, state.pendingMemoRaw, 'text');
     }
 
-    // ===== 音声入力 =====
+    // ===== 音声入力（continuous mode） =====
     let recognition = null;
+    let isRecording = false;
+    let currentRecordingType = null;
+    let finalTextBuffer = '';  // 確定テキストを蓄積
+
+    function toggleVoiceInput(type) {
+      if (isRecording && currentRecordingType === type) {
+        // 録音中なら停止
+        stopVoiceInput(type);
+      } else {
+        // 録音開始
+        startVoiceInput(type);
+      }
+    }
 
     function startVoiceInput(type) {
       if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -1004,39 +1112,121 @@
         return;
       }
 
+      // 既に録音中なら停止
+      if (recognition) {
+        recognition.abort();
+      }
+
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognition = new SpeechRecognition();
       recognition.lang = 'ja-JP';
-      recognition.continuous = false;
-      recognition.interimResults = true;
+      recognition.continuous = true;        // 停止まで継続
+      recognition.interimResults = true;    // 途中結果も取得
 
       const micBtn = document.getElementById(type + 'MicBtn');
       const statusEl = document.getElementById(type + 'VoiceStatus');
       const inputEl = document.getElementById(type + 'TextInput');
 
+      // 状態リセット
+      finalTextBuffer = '';
+      isRecording = true;
+      currentRecordingType = type;
+
       micBtn.classList.add('recording');
-      statusEl.textContent = '聞いています...';
+      micBtn.textContent = '⏹';
+      statusEl.textContent = '🎤 録音中...タップで停止';
 
       recognition.onresult = function(event) {
-        let transcript = '';
-        for (let i = 0; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
         }
-        inputEl.value = transcript;
-        statusEl.textContent = transcript;
+
+        // 確定テキストをバッファに追加
+        if (finalTranscript) {
+          finalTextBuffer += finalTranscript;
+        }
+
+        // 入力欄に表示（確定 + 途中）
+        inputEl.value = finalTextBuffer + interimTranscript;
+        statusEl.textContent = '🎤 ' + (finalTextBuffer + interimTranscript).slice(-30);
       };
 
       recognition.onerror = function(event) {
-        micBtn.classList.remove('recording');
-        statusEl.textContent = 'エラー: ' + event.error;
+        console.error('Voice error:', event.error);
+        if (event.error !== 'aborted') {
+          showToast('音声認識エラー: ' + event.error);
+        }
+        resetVoiceUI(type);
       };
 
       recognition.onend = function() {
-        micBtn.classList.remove('recording');
-        statusEl.textContent = '';
+        // continuous=trueでも途切れることがあるので、録音中なら再開
+        if (isRecording && currentRecordingType === type) {
+          try {
+            recognition.start();
+          } catch (e) {
+            // 既に開始している場合は無視
+          }
+        }
       };
 
-      recognition.start();
+      try {
+        recognition.start();
+      } catch (e) {
+        showToast('音声入力の開始に失敗しました');
+        resetVoiceUI(type);
+      }
+    }
+
+    function stopVoiceInput(type) {
+      isRecording = false;
+      currentRecordingType = null;
+
+      if (recognition) {
+        recognition.stop();
+        recognition = null;
+      }
+
+      const micBtn = document.getElementById(type + 'MicBtn');
+      const statusEl = document.getElementById(type + 'VoiceStatus');
+      const inputEl = document.getElementById(type + 'TextInput');
+
+      micBtn.classList.remove('recording');
+      micBtn.textContent = '🎤';
+
+      // 確定テキストがあればAI処理を実行
+      const text = inputEl.value.trim();
+      if (text) {
+        statusEl.textContent = 'AI処理中...';
+        if (type === 'calendar') {
+          handleCalendarInput();
+        } else if (type === 'memo') {
+          handleMemoInput();
+        }
+      } else {
+        statusEl.textContent = '';
+      }
+    }
+
+    function resetVoiceUI(type) {
+      isRecording = false;
+      currentRecordingType = null;
+      recognition = null;
+
+      const micBtn = document.getElementById(type + 'MicBtn');
+      const statusEl = document.getElementById(type + 'VoiceStatus');
+
+      micBtn.classList.remove('recording');
+      micBtn.textContent = '🎤';
+      statusEl.textContent = '';
     }
 
     // ===== ユーティリティ =====

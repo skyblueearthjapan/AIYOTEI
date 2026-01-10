@@ -162,27 +162,41 @@ function parseCalendarText(text) {
     throw new Error('AIの応答をJSONとしてパースできませんでした');
   }
 
-  // バリデーション
-  validateCalendarData(parsed);
+  // バリデーション（rawTextをフォールバック用に渡す）
+  validateCalendarData(parsed, text);
 
   return parsed;
 }
 
 /**
- * Calendar解析結果のバリデーション
+ * Calendar解析結果のバリデーション（フォールバック付き）
  * @param {Object} data - 解析データ
+ * @param {string} rawText - 元の入力テキスト（フォールバック用）
  */
-function validateCalendarData(data) {
+function validateCalendarData(data, rawText) {
+  // titleのフォールバック（空禁止）
   if (!data.title || data.title.trim() === '') {
-    throw new Error('タイトルが抽出できませんでした');
+    // 1. memoから先頭20文字を仮タイトルに
+    if (data.memo && data.memo.trim()) {
+      data.title = data.memo.trim().substring(0, 20);
+    }
+    // 2. rawTextから先頭20文字を仮タイトルに
+    else if (rawText && rawText.trim()) {
+      data.title = rawText.trim().substring(0, 20);
+    }
+    // 3. それでも無理なら「予定」
+    else {
+      data.title = '予定';
+    }
   }
 
+  // start_dateのフォールバック（今日）
   if (!data.start_date || !/^\d{4}-\d{2}-\d{2}$/.test(data.start_date)) {
-    throw new Error('開始日が正しく抽出できませんでした');
+    data.start_date = getTodayDate();
   }
 
+  // end_dateのフォールバック（start_dateと同じ）
   if (!data.end_date || !/^\d{4}-\d{2}-\d{2}$/.test(data.end_date)) {
-    // end_dateが無い場合はstart_dateと同じにする
     data.end_date = data.start_date;
   }
 

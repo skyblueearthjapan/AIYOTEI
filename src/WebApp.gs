@@ -111,7 +111,7 @@ function getRokuyoByMonth(year, month) {
 }
 
 /**
- * 予定を登録（Webアプリから呼び出し）
+ * 予定を登録（Webアプリから呼び出し・AI解析経由）
  * @param {string} text - 入力テキスト
  * @param {string} source - ソース（"voice" or "text"）
  * @returns {Object}
@@ -128,6 +128,44 @@ function registerEvent(text, source) {
     };
   } catch (error) {
     writeErrorLog('calendar', text, 'insert_event', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 予定を直接登録（フォームから編集済みデータを受け取る）
+ * @param {Object} eventData - イベントデータ（title, start_date, end_date, start_time, end_time, memo, all_day）
+ * @param {string} rawText - 元の入力テキスト
+ * @returns {Object}
+ */
+function registerEventDirect(eventData, rawText) {
+  try {
+    // 最低限のバリデーション
+    if (!eventData.title || !eventData.title.trim()) {
+      throw new Error('タイトルが必要です');
+    }
+    if (!eventData.start_date) {
+      throw new Error('日付が必要です');
+    }
+
+    // end_dateがなければstart_dateと同じに
+    if (!eventData.end_date) {
+      eventData.end_date = eventData.start_date;
+    }
+
+    // DBに登録
+    insertEventToDB(eventData, rawText || '', 'text');
+
+    return {
+      success: true,
+      data: eventData,
+      message: `予定「${eventData.title}」を登録しました`
+    };
+  } catch (error) {
+    writeErrorLog('calendar', rawText || '', 'insert_event', error);
     return {
       success: false,
       error: error.message
