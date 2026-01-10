@@ -539,17 +539,6 @@
 
   <!-- カレンダーページ -->
   <div class="page active" id="page-calendar">
-    <!-- 音声入力 -->
-    <div class="voice-input-area">
-      <button class="mic-button" id="calendarMicBtn">🎤</button>
-      <div class="voice-hint">タップして予定を話す</div>
-      <div class="voice-status" id="calendarVoiceStatus"></div>
-      <div class="text-input-area">
-        <input type="text" class="text-input" id="calendarTextInput" placeholder="例：来週火曜15時に歯医者">
-        <button class="send-btn" id="calendarSendBtn">登録</button>
-      </div>
-    </div>
-
     <!-- カレンダー -->
     <div class="calendar-header">
       <button class="calendar-nav-btn" id="prevMonthBtn">◀</button>
@@ -568,6 +557,17 @@
         <div class="weekday">土</div>
       </div>
       <div class="calendar-days" id="calendarDays"></div>
+    </div>
+
+    <!-- 音声入力（カレンダーの下） -->
+    <div class="voice-input-area" style="margin-top: 16px; margin-bottom: 0;">
+      <button class="mic-button" id="calendarMicBtn">🎤</button>
+      <div class="voice-hint">タップして予定を話す</div>
+      <div class="voice-status" id="calendarVoiceStatus"></div>
+      <div class="text-input-area">
+        <input type="text" class="text-input" id="calendarTextInput" placeholder="例：来週火曜15時に歯医者">
+        <button class="send-btn" id="calendarSendBtn">登録</button>
+      </div>
     </div>
   </div>
 
