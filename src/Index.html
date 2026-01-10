@@ -1175,19 +1175,26 @@
 
       recognition.onerror = function(event) {
         console.error('Voice error:', event.error);
-        if (event.error !== 'aborted') {
+        if (event.error !== 'aborted' && event.error !== 'no-speech') {
           showToast('音声認識エラー: ' + event.error);
         }
         resetVoiceUI(type);
       };
 
       recognition.onend = function() {
-        // continuous=trueでも途切れることがあるので、録音中なら再開
+        // 録音中フラグがtrueでも、自動再開はしない（ループ防止）
+        // ユーザーが明示的に停止するか、エラーで終了したら終わり
         if (isRecording && currentRecordingType === type) {
-          try {
-            recognition.start();
-          } catch (e) {
-            // 既に開始している場合は無視
+          // 自動停止した場合は、ユーザーに通知して手動で再開させる
+          resetVoiceUI(type);
+          const inputEl = document.getElementById(type + 'TextInput');
+          if (inputEl.value.trim()) {
+            // テキストがあればAI処理を実行
+            if (type === 'calendar') {
+              handleCalendarInput();
+            } else if (type === 'memo') {
+              handleMemoInput();
+            }
           }
         }
       };
