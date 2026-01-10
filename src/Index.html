@@ -1116,10 +1116,9 @@
         dayEvents.slice(0, MAX_EVENTS_PER_DAY).forEach(evt => {
           const eventEl = document.createElement('div');
           eventEl.className = 'day-event';
-          // color_keyがあれば対応するクラスを付与
-          if (evt?.color_key) {
-            eventEl.classList.add('event-color-' + evt.color_key);
-          }
+          // color_keyを取得（なければタイトルから推測）
+          const colorKey = getEventColorKey(evt);
+          eventEl.classList.add('event-color-' + colorKey);
           eventEl.textContent = evt?.title ?? '';
           eventsDiv.appendChild(eventEl);
         });
@@ -1172,20 +1171,34 @@
     }
 
     function changeMemoDay(delta) {
-      const d = new Date(state.memoDate);
+      const d = toLocalDate(state.memoDate);
       d.setDate(d.getDate() + delta);
-      state.memoDate = formatDateISO(d);
+      state.memoDate = toDateString(d);
       loadMemoDataSafe();
     }
 
+    // YYYY-MM-DD文字列 → ローカル日付（UTC解釈を防ぐ）
+    function toLocalDate(dateStr) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    // Date → YYYY-MM-DD文字列（ローカル時間で）
+    function toDateString(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
     function formatDateJP(dateStr) {
-      const d = new Date(dateStr);
+      const d = toLocalDate(dateStr);
       const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
       return `${d.getMonth() + 1}/${d.getDate()}（${weekdays[d.getDay()]}）`;
     }
 
     function formatDateISO(date) {
-      return date.toISOString().split('T')[0];
+      return toDateString(date);
     }
 
     function copyMemo() {
@@ -1354,6 +1367,39 @@
       document.getElementById(type + 'Modal').classList.remove('show');
     }
 
+    // ===== 色カテゴリ判定 =====
+    // タイトルからcolor_keyを推測（フォールバック用）
+    function guessColorKeyFromTitle(title) {
+      if (!title) return 'other';
+      const t = title.toLowerCase();
+
+      // health: 医療・健康
+      if (/歯|病院|医|検診|薬|ジム|運動|美容|整体|マッサージ|健康/.test(t)) return 'health';
+      // work: 仕事
+      if (/会議|打ち合わせ|出張|面接|仕事|ミーティング|mtg|商談|取引/.test(t)) return 'work';
+      // family: 家族・人付き合い
+      if (/家族|友達|友人|デート|結婚|お見舞|親|母|父|子供|息子|娘|兄|姉|弟|妹|祖/.test(t)) return 'family';
+      // finance: お金・手続き
+      if (/銀行|役所|保険|税|契約|支払|振込|手続|届|申請|更新/.test(t)) return 'finance';
+      // travel: 旅行・移動
+      if (/旅行|帰省|引越|送迎|出発|到着|空港|駅|新幹線|飛行機/.test(t)) return 'travel';
+      // fun: 趣味・娯楽
+      if (/映画|コンサート|ライブ|飲み会|イベント|パーティ|遊び|カラオケ|ゲーム|スポーツ観戦/.test(t)) return 'fun';
+      // school: 学校・学習
+      if (/授業|試験|塾|習い事|PTA|学校|勉強|講座|セミナー|研修/.test(t)) return 'school';
+
+      return 'other';
+    }
+
+    // イベントのcolor_keyを取得（なければ推測）
+    function getEventColorKey(evt) {
+      if (evt?.color_key && evt.color_key !== 'other') {
+        return evt.color_key;
+      }
+      // color_keyがない、またはotherの場合はタイトルから推測
+      return guessColorKeyFromTitle(evt?.title);
+    }
+
     // ===== 日付詳細モーダル =====
     // color_key → グラデーション背景のマップ
     const COLOR_KEY_GRADIENTS = {
@@ -1368,7 +1414,7 @@
     };
 
     function openDayDetailModal(dateStr) {
-      const d = new Date(dateStr);
+      const d = toLocalDate(dateStr);
       const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
       const titleText = `${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}）`;
       document.getElementById('dayDetailTitle').textContent = titleText;
@@ -1392,7 +1438,7 @@
         contentHtml += '<div style="display: flex; flex-direction: column; gap: 12px;">';
         dayEvents.forEach(evt => {
           const timeStr = evt.start_time ? evt.start_time.substring(0, 5) : '終日';
-          const colorKey = evt.color_key || 'other';
+          const colorKey = getEventColorKey(evt);
           const bgGradient = COLOR_KEY_GRADIENTS[colorKey] || COLOR_KEY_GRADIENTS.other;
           const eventId = evt.event_id || '';
           contentHtml += `
