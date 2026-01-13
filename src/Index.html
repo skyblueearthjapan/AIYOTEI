@@ -831,7 +831,8 @@
       <div class="voice-hint">タップしてメモを追加</div>
       <div class="voice-status" id="memoVoiceStatus"></div>
       <div class="text-input-area">
-        <input type="text" class="text-input" id="memoTextInput" placeholder="メモを入力...">
+        <textarea class="text-input-multi" id="memoTextInput" rows="3"
+          placeholder="音声入力または直接入力。修正してから追記できます。"></textarea>
         <button class="send-btn" id="memoSendBtn">追記</button>
       </div>
     </div>
@@ -1084,8 +1085,12 @@
 
       // メモ入力
       document.getElementById('memoSendBtn').addEventListener('click', handleMemoInput);
-      document.getElementById('memoTextInput').addEventListener('keypress', e => {
-        if (e.key === 'Enter') handleMemoInput();
+      // textareaなのでCtrl+Enterで送信
+      document.getElementById('memoTextInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          handleMemoInput();
+        }
       });
 
       // コピーボタン
@@ -2155,22 +2160,13 @@
       micBtn.classList.remove('recording');
       micBtn.textContent = '🎤';
 
+      // 自動でAI処理しない（ユーザーが編集→ボタン押下）
       const text = inputEl.value.trim();
-      if (type === 'calendar') {
-        // カレンダーの場合は自動でAI処理しない（ユーザーが編集→登録ボタン）
-        if (text) {
-          statusEl.textContent = '必要なら修正して「登録」を押してください';
-        } else {
-          statusEl.textContent = '';
-        }
+      if (text) {
+        const buttonLabel = type === 'calendar' ? '登録' : '追記';
+        statusEl.textContent = '必要なら修正して「' + buttonLabel + '」を押してください';
       } else {
-        // メモの場合は従来通り
-        if (text) {
-          statusEl.textContent = 'AI処理中...';
-          handleMemoInput();
-        } else {
-          statusEl.textContent = '';
-        }
+        statusEl.textContent = '';
       }
     }
 
