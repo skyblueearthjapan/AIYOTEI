@@ -245,3 +245,49 @@ function cleanMemoText(rawText) {
   // 余分な空白を整理
   return response.trim();
 }
+
+// ===========================================
+// 音声文字起こし整形（Webアプリから呼び出し）
+// ===========================================
+
+const AI_CLEAN_TEXT_PROMPT = `次の日本語の音声書き起こしを、意味を変えずに読みやすく整えてください。
+
+条件:
+- 「えー」「あのー」「そのー」「えっと」などのフィラーや言い直しを自然に除去
+- 箇条書き（・や-など）を勝手に追加しない（原文にある場合のみ許可）
+- 文章は短めの段落で区切るのはOK
+- フォーマット固定はしない（自然文のまま）
+- 意味や内容を変えない
+
+テキスト:`;
+
+/**
+ * 音声文字起こしテキストを整形（Webアプリから呼び出し）
+ * @param {string} rawText - 音声入力の生テキスト
+ * @returns {Object} { success: boolean, cleanedText: string, error?: string }
+ */
+function aiCleanText(rawText) {
+  try {
+    rawText = String(rawText || '').trim();
+    if (!rawText) {
+      return { success: true, cleanedText: '' };
+    }
+
+    const model = getMemoModel();
+    const prompt = AI_CLEAN_TEXT_PROMPT + '\n' + rawText;
+
+    const response = callOpenAI('あなたは日本語テキストを整形するアシスタントです。指示に従って整形したテキストのみを出力してください。', prompt, model, false);
+
+    return {
+      success: true,
+      cleanedText: (response || '').trim()
+    };
+  } catch (error) {
+    console.error('aiCleanText error:', error);
+    return {
+      success: false,
+      cleanedText: '',
+      error: error.message
+    };
+  }
+}
