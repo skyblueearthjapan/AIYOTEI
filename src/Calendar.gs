@@ -149,15 +149,16 @@ function formatDateValue(value, tz) {
 /**
  * 時刻値をフォーマット（Date/文字列 → "HH:mm" 文字列）
  * @param {Date|string|null} value - 時刻値
- * @param {string} tz - タイムゾーン
+ * @param {string} tz - タイムゾーン（未使用、互換性のため残す）
  * @returns {string|null} HH:mm形式、または null
  */
 function formatTimeValue(value, tz) {
   if (value == null || value === '') return null;
 
   // Date オブジェクトの場合
+  // スプレッドシートの時刻値はUTCベースで保存されるため、GMTで取得
   if (value instanceof Date) {
-    return Utilities.formatDate(value, tz, 'HH:mm');
+    return Utilities.formatDate(value, 'GMT', 'HH:mm');
   }
 
   // 文字列の場合
