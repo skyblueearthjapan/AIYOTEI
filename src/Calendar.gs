@@ -498,3 +498,90 @@ function getHolidaysByMonth(year, month) {
 
   return holidayMap;
 }
+
+// ===========================================
+// Googleカレンダー同期ヘルパー（EVENT_COLSを使用）
+// ===========================================
+
+/**
+ * DB保存後にGoogleカレンダーへ同期
+ * @param {number} rowIndex - シートの行番号（1-based）
+ * @param {Object} eventObj - イベントデータ
+ */
+function syncNewEventToGoogle(rowIndex, eventObj) {
+  const sheet = getSheet(SHEET_NAMES.DB_EVENTS);
+
+  try {
+    const googleEventId = createGoogleCalendarEvent_(eventObj);
+
+    // 同期成功
+    sheet.getRange(rowIndex, EVENT_COLS.GOOGLE_EVENT_ID + 1).setValue(googleEventId);
+    sheet.getRange(rowIndex, EVENT_COLS.GCAL_SYNC_STATUS + 1).setValue('synced');
+    sheet.getRange(rowIndex, EVENT_COLS.GCAL_SYNCED_AT + 1).setValue(new Date());
+    sheet.getRange(rowIndex, EVENT_COLS.GCAL_ERROR + 1).setValue('');
+
+    return { success: true, googleEventId: googleEventId };
+  } catch (e) {
+    console.error('syncNewEventToGoogle error:', e);
+    sheet.getRange(rowIndex, EVENT_COLS.GCAL_SYNC_STATUS + 1).setValue('failed');
+    sheet.getRange(rowIndex, EVENT_COLS.GCAL_ERROR + 1).setValue(String(e));
+
+    return { success: false, error: String(e) };
+  }
+}
+
+/**
+ * DB更新後にGoogleカレンダーへ同期
+ * @param {number} rowIndex - シートの行番号（1-based）
+ * @param {Object} eventObj - イベントデータ
+ * @param {string} existingGoogleId - 既存のGoogleイベントID
+ */
+function syncUpdatedEventToGoogle(rowIndex, eventObj, existingGoogleId) {
+  const sheet = getSheet(SHEET_NAMES.DB_EVENTS);
+
+  try {
+    const newGoogleEventId = upsertGoogleCalendarEvent_(eventObj, existingGoogleId);
+
+    // 同期成功
+    sheet.getRange(rowIndex, EVENT_COLS.GOOGLE_EVENT_ID + 1).setValue(newGoogleEventId);
+    sheet.getRange(rowIndex, EVENT_COLS.GCAL_SYNC_STATUS + 1).setValue('synced');
+    sheet.getRange(rowIndex, EVENT_COLS.GCAL_SYNCED_AT + 1).setValue(new Date());
+    sheet.getRange(rowIndex, EVENT_COLS.GCAL_ERROR + 1).setValue('');
+
+    return { success: true, googleEventId: newGoogleEventId };
+  } catch (e) {
+    console.error('syncUpdatedEventToGoogle error:', e);
+    sheet.getRange(rowIndex, EVENT_COLS.GCAL_SYNC_STATUS + 1).setValue('failed');
+    sheet.getRange(rowIndex, EVENT_COLS.GCAL_ERROR + 1).setValue(String(e));
+
+    return { success: false, error: String(e) };
+  }
+}
+
+/**
+ * DB削除後にGoogleカレンダーからも削除
+ * @param {number} rowIndex - シートの行番号（1-based）
+ * @param {string} googleEventId - GoogleイベントID
+ */
+function syncDeletedEventToGoogle(rowIndex, googleEventId) {
+  const sheet = getSheet(SHEET_NAMES.DB_EVENTS);
+
+  try {
+    if (googleEventId) {
+      deleteGoogleCalendarEvent_(googleEventId);
+    }
+
+    // 同期成功
+    sheet.getRange(rowIndex, EVENT_COLS.GCAL_SYNC_STATUS + 1).setValue('synced');
+    sheet.getRange(rowIndex, EVENT_COLS.GCAL_SYNCED_AT + 1).setValue(new Date());
+    sheet.getRange(rowIndex, EVENT_COLS.GCAL_ERROR + 1).setValue('');
+
+    return { success: true };
+  } catch (e) {
+    console.error('syncDeletedEventToGoogle error:', e);
+    sheet.getRange(rowIndex, EVENT_COLS.GCAL_SYNC_STATUS + 1).setValue('failed');
+    sheet.getRange(rowIndex, EVENT_COLS.GCAL_ERROR + 1).setValue(String(e));
+
+    return { success: false, error: String(e) };
+  }
+}
