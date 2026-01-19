@@ -585,3 +585,82 @@ function syncDeletedEventToGoogle(rowIndex, googleEventId) {
     return { success: false, error: String(e) };
   }
 }
+
+// ===========================================
+// 既存イベント一括同期（初回セットアップ用）
+// ===========================================
+
+/**
+ * 既存の全イベントをGoogleカレンダーに一括同期
+ * google_event_idが空のactiveイベントのみ対象
+ * GASエディタから手動で1回実行する
+ */
+function syncAllExistingEvents() {
+  const sheet = getSheet(SHEET_NAMES.DB_EVENTS);
+  const data = sheet.getDataRange().getValues();
+  const tz = getSettings().timezone;
+
+  let syncedCount = 0;
+  let failedCount = 0;
+  let skippedCount = 0;
+
+  console.log('=== 既存イベント一括同期開始 ===');
+
+  // ヘッダー行をスキップ（1行目はタイトル、2行目がヘッダー）
+  for (let i = 2; i < data.length; i++) {
+    const row = data[i];
+    const rowIndex = i + 1; // 1-based
+
+    // activeでないイベントはスキップ
+    if (row[EVENT_COLS.STATUS] !== 'active') {
+      continue;
+    }
+
+    // すでにgoogle_event_idがあるイベントはスキップ
+    if (row[EVENT_COLS.GOOGLE_EVENT_ID]) {
+      skippedCount++;
+      continue;
+    }
+
+    // イベントデータを構築
+    const eventObj = {
+      title: row[EVENT_COLS.TITLE],
+      start_date: formatDateValue(row[EVENT_COLS.START_DATE], tz),
+      end_date: formatDateValue(row[EVENT_COLS.END_DATE], tz),
+      start_time: formatTimeValue(row[EVENT_COLS.START_TIME], tz),
+      end_time: formatTimeValue(row[EVENT_COLS.END_TIME], tz),
+      all_day: row[EVENT_COLS.ALL_DAY] === 'TRUE' || row[EVENT_COLS.ALL_DAY] === true,
+      memo: row[EVENT_COLS.MEMO] || null
+    };
+
+    // Googleカレンダーに同期
+    const result = syncNewEventToGoogle(rowIndex, eventObj);
+
+    if (result.success) {
+      syncedCount++;
+      console.log(`[成功] Row ${rowIndex}: ${eventObj.title}`);
+    } else {
+      failedCount++;
+      console.log(`[失敗] Row ${rowIndex}: ${eventObj.title} - ${result.error}`);
+    }
+
+    // API制限対策：少し待機（100ms）
+    Utilities.sleep(100);
+  }
+
+  const summary = `=== 一括同期完了 ===\n同期成功: ${syncedCount}件\n同期失敗: ${failedCount}件\nスキップ（同期済み）: ${skippedCount}件`;
+  console.log(summary);
+
+  // スプレッドシートにも通知
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    `同期成功: ${syncedCount}件, 失敗: ${failedCount}件, スキップ: ${skippedCount}件`,
+    '一括同期完了',
+    10
+  );
+
+  return {
+    synced: syncedCount,
+    failed: failedCount,
+    skipped: skippedCount
+  };
+}
