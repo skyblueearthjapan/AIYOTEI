@@ -21,7 +21,12 @@ const EVENT_COLS = {
   MEMO: 11,         // L: memo
   STATUS: 12,       // M: status
   LAST_AI_MODEL: 13,// N: last_ai_model
-  COLOR_KEY: 14     // O: color_key (health, work, family, finance, travel, fun, school, other)
+  COLOR_KEY: 14,    // O: color_key
+  // Google Calendar 同期用
+  GOOGLE_EVENT_ID: 15,   // P: google_event_id
+  GCAL_SYNC_STATUS: 16,  // Q: gcal_sync_status (pending/synced/failed/disabled)
+  GCAL_SYNCED_AT: 17,    // R: gcal_synced_at
+  GCAL_ERROR: 18         // S: gcal_error
 };
 
 // ===========================================
@@ -48,6 +53,14 @@ function insertEventToDB(eventData, rawText, source = 'text') {
 
   sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
 
+  // Googleカレンダーへ同期
+  try {
+    syncNewEventToGoogle(targetRow, eventData);
+  } catch (e) {
+    console.error('Google Calendar sync error:', e);
+    // 同期失敗してもDB保存は成功扱い
+  }
+
   // ログ記録
   try {
     writeLog('calendar', rawText, JSON.stringify(eventData), 'insert_event', 'success');
@@ -68,7 +81,7 @@ function insertEventToDB(eventData, rawText, source = 'text') {
  * @returns {Array} 行データ配列
  */
 function createEventRow(eventData, rawText, source, model) {
-  const row = new Array(15).fill('');
+  const row = new Array(19).fill('');
 
   row[EVENT_COLS.EVENT_ID] = newEventId();
   row[EVENT_COLS.CREATED_AT] = getCurrentDateTime();
@@ -85,6 +98,11 @@ function createEventRow(eventData, rawText, source, model) {
   row[EVENT_COLS.STATUS] = 'active';
   row[EVENT_COLS.LAST_AI_MODEL] = model;
   row[EVENT_COLS.COLOR_KEY] = eventData.color_key || 'other';
+  // Google Calendar 同期用（初期値は空）
+  row[EVENT_COLS.GOOGLE_EVENT_ID] = '';
+  row[EVENT_COLS.GCAL_SYNC_STATUS] = 'pending';
+  row[EVENT_COLS.GCAL_SYNCED_AT] = '';
+  row[EVENT_COLS.GCAL_ERROR] = '';
 
   return row;
 }
@@ -280,15 +298,40 @@ function updateEventStatus(eventId, newStatus) {
 }
 
 /**
- * イベントを削除（論理削除）
+ * イベントを削除（論理削除）+ Googleカレンダーから削除
  * @param {string} eventId - イベントID
+ * @returns {Object} 結果
  */
 function deleteEvent(eventId) {
-  return updateEventStatus(eventId, 'deleted');
+  const sheet = getSheet(SHEET_NAMES.DB_EVENTS);
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = 2; i < data.length; i++) {
+    if (data[i][EVENT_COLS.EVENT_ID] === eventId) {
+      const targetRow = i + 1;
+      const googleEventId = data[i][EVENT_COLS.GOOGLE_EVENT_ID];
+
+      // DBのステータスをdeletedに
+      sheet.getRange(targetRow, EVENT_COLS.STATUS + 1).setValue('deleted');
+      sheet.getRange(targetRow, EVENT_COLS.UPDATED_AT + 1).setValue(getCurrentDateTime());
+
+      // Googleカレンダーから削除
+      try {
+        syncDeletedEventToGoogle(targetRow, googleEventId);
+      } catch (e) {
+        console.error('Google Calendar delete sync error:', e);
+        // 同期失敗してもDB削除は成功扱い
+      }
+
+      return { success: true, message: '予定を削除しました' };
+    }
+  }
+
+  return { success: false, error: '指定されたイベントが見つかりません' };
 }
 
 /**
- * イベントを更新
+ * イベントを更新 + Googleカレンダーに同期
  * @param {Object} payload - 更新データ
  * @returns {Object} 結果 { success: boolean, message?: string, error?: string }
  */
@@ -296,6 +339,7 @@ function updateEvent(payload) {
   try {
     const sheet = getSheet(SHEET_NAMES.DB_EVENTS);
     const data = sheet.getDataRange().getValues();
+    const tz = getSettings().timezone;
     const eventId = payload.event_id;
 
     if (!eventId) {
@@ -304,9 +348,11 @@ function updateEvent(payload) {
 
     // event_idで行を検索
     let targetRow = -1;
+    let rowData = null;
     for (let i = 2; i < data.length; i++) {
       if (data[i][EVENT_COLS.EVENT_ID] === eventId) {
         targetRow = i + 1; // 1-indexed for getRange
+        rowData = data[i];
         break;
       }
     }
@@ -314,6 +360,9 @@ function updateEvent(payload) {
     if (targetRow === -1) {
       return { success: false, error: '指定されたイベントが見つかりません' };
     }
+
+    // 既存のGoogleイベントIDを取得
+    const existingGoogleId = rowData[EVENT_COLS.GOOGLE_EVENT_ID] || '';
 
     // 各フィールドを更新
     if (payload.title !== undefined) {
@@ -343,6 +392,24 @@ function updateEvent(payload) {
 
     // updated_atを更新
     sheet.getRange(targetRow, EVENT_COLS.UPDATED_AT + 1).setValue(getCurrentDateTime());
+
+    // Googleカレンダーへ同期（更新後のデータを構築）
+    try {
+      const eventObj = {
+        title: payload.title !== undefined ? payload.title : rowData[EVENT_COLS.TITLE],
+        start_date: payload.start_date !== undefined ? payload.start_date : formatDateValue(rowData[EVENT_COLS.START_DATE], tz),
+        end_date: payload.end_date !== undefined ? payload.end_date : formatDateValue(rowData[EVENT_COLS.END_DATE], tz),
+        start_time: payload.start_time !== undefined ? payload.start_time : formatTimeValue(rowData[EVENT_COLS.START_TIME], tz),
+        end_time: payload.end_time !== undefined ? payload.end_time : formatTimeValue(rowData[EVENT_COLS.END_TIME], tz),
+        all_day: payload.all_day !== undefined ? payload.all_day : (rowData[EVENT_COLS.ALL_DAY] === 'TRUE' || rowData[EVENT_COLS.ALL_DAY] === true),
+        memo: payload.memo !== undefined ? payload.memo : rowData[EVENT_COLS.MEMO]
+      };
+
+      syncUpdatedEventToGoogle(targetRow, eventObj, existingGoogleId);
+    } catch (e) {
+      console.error('Google Calendar update sync error:', e);
+      // 同期失敗してもDB更新は成功扱い
+    }
 
     return { success: true, message: '予定を更新しました' };
 
