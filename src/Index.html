@@ -2067,6 +2067,7 @@
 
       // 状態リセット
       finalTextBuffer = '';
+      inputEl.value = '';  // テキストエリアもクリア
       isRecording = true;
       currentRecordingType = type;
       __speechRetry = 0; // 開始時にリトライカウントリセット
