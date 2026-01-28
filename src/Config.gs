@@ -20,9 +20,9 @@ const SHEET_NAMES = {
 // スクリプトプロパティキー
 // ===========================================
 const PROP_KEYS = {
-  OPENAI_API_KEY: 'OPENAI_API_KEY',
-  OPENAI_MODEL_CALENDAR: 'OPENAI_MODEL_CALENDAR',
-  OPENAI_MODEL_MEMO: 'OPENAI_MODEL_MEMO'
+  GEMINI_API_KEY: 'GEMINI_API_KEY',
+  GEMINI_MODEL_CALENDAR: 'GEMINI_MODEL_CALENDAR',
+  GEMINI_MODEL_MEMO: 'GEMINI_MODEL_MEMO'
 };
 
 // ===========================================
@@ -30,7 +30,7 @@ const PROP_KEYS = {
 // ===========================================
 const DEFAULTS = {
   TIMEZONE: 'Asia/Tokyo',
-  OPENAI_MODEL: 'gpt-4o-mini'
+  GEMINI_MODEL: 'gemini-1.5-flash'
 };
 
 // ===========================================
@@ -86,13 +86,13 @@ function getProperty(key, defaultValue = '') {
 }
 
 /**
- * OpenAI APIキーを取得
+ * Gemini APIキーを取得
  * @returns {string}
  */
-function getOpenAIApiKey() {
-  const key = getProperty(PROP_KEYS.OPENAI_API_KEY);
+function getGeminiApiKey() {
+  const key = getProperty(PROP_KEYS.GEMINI_API_KEY);
   if (!key) {
-    throw new Error('OPENAI_API_KEY がスクリプトプロパティに設定されていません');
+    throw new Error('GEMINI_API_KEY がスクリプトプロパティに設定されていません');
   }
   return key;
 }
@@ -102,7 +102,7 @@ function getOpenAIApiKey() {
  * @returns {string}
  */
 function getCalendarModel() {
-  return getProperty(PROP_KEYS.OPENAI_MODEL_CALENDAR, DEFAULTS.OPENAI_MODEL);
+  return getProperty(PROP_KEYS.GEMINI_MODEL_CALENDAR, DEFAULTS.GEMINI_MODEL);
 }
 
 /**
@@ -110,7 +110,7 @@ function getCalendarModel() {
  * @returns {string}
  */
 function getMemoModel() {
-  return getProperty(PROP_KEYS.OPENAI_MODEL_MEMO, DEFAULTS.OPENAI_MODEL);
+  return getProperty(PROP_KEYS.GEMINI_MODEL_MEMO, DEFAULTS.GEMINI_MODEL);
 }
 
 // ===========================================

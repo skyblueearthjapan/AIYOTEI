@@ -1,44 +1,47 @@
 /**
- * OpenAI.gs
- * OpenAI API呼び出し共通関数
+ * AI.gs
+ * Gemini API呼び出し共通関数
  */
 
 // ===========================================
-// OpenAI API共通
+// Gemini API共通
 // ===========================================
 
 /**
- * OpenAI Chat Completion APIを呼び出す
+ * Gemini APIを呼び出す
  * @param {string} systemPrompt - システムプロンプト
  * @param {string} userMessage - ユーザーメッセージ
  * @param {string} model - 使用モデル
  * @param {boolean} jsonMode - JSONモードを有効にするか
  * @returns {string} AIの応答テキスト
  */
-function callOpenAI(systemPrompt, userMessage, model, jsonMode = false) {
-  const apiKey = getOpenAIApiKey();
-  const url = 'https://api.openai.com/v1/chat/completions';
+function callGemini(systemPrompt, userMessage, model, jsonMode = false) {
+  const apiKey = getGeminiApiKey();
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const payload = {
-    model: model,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userMessage }
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: userMessage }]
+      }
     ],
-    temperature: 0.3
+    systemInstruction: {
+      parts: [{ text: systemPrompt }]
+    },
+    generationConfig: {
+      temperature: 0.3
+    }
   };
 
   // JSONモードの場合
   if (jsonMode) {
-    payload.response_format = { type: 'json_object' };
+    payload.generationConfig.responseMimeType = 'application/json';
   }
 
   const options = {
     method: 'post',
     contentType: 'application/json',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`
-    },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   };
@@ -48,20 +51,26 @@ function callOpenAI(systemPrompt, userMessage, model, jsonMode = false) {
   const responseText = response.getContentText();
 
   if (responseCode !== 200) {
-    console.error('OpenAI API Error:', responseText);
-    throw new Error(`OpenAI APIエラー (${responseCode}): ${parseOpenAIError(responseText)}`);
+    console.error('Gemini API Error:', responseText);
+    throw new Error(`Gemini APIエラー (${responseCode}): ${parseGeminiError(responseText)}`);
   }
 
   const result = JSON.parse(responseText);
-  return result.choices[0].message.content;
+
+  // Geminiのレスポンス形式からテキストを抽出
+  if (result.candidates && result.candidates[0] && result.candidates[0].content) {
+    return result.candidates[0].content.parts[0].text;
+  }
+
+  throw new Error('Gemini APIから有効なレスポンスが返されませんでした');
 }
 
 /**
- * OpenAIエラーレスポンスをパース
+ * Geminiエラーレスポンスをパース
  * @param {string} responseText - レスポンステキスト
  * @returns {string} エラーメッセージ
  */
-function parseOpenAIError(responseText) {
+function parseGeminiError(responseText) {
   try {
     const error = JSON.parse(responseText);
     return error.error?.message || 'Unknown error';
@@ -196,7 +205,7 @@ function parseCalendarText(text) {
   const model = getCalendarModel();
   const systemPrompt = getCalendarSystemPrompt();
 
-  const response = callOpenAI(systemPrompt, text, model, true);
+  const response = callGemini(systemPrompt, text, model, true);
 
   let parsed;
   try {
@@ -272,7 +281,7 @@ function validateCalendarData(data, rawText) {
 function cleanMemoText(rawText) {
   const model = getMemoModel();
 
-  const response = callOpenAI(MEMO_SYSTEM_PROMPT, rawText, model, false);
+  const response = callGemini(MEMO_SYSTEM_PROMPT, rawText, model, false);
 
   // 余分な空白を整理
   return response.trim();
@@ -308,7 +317,7 @@ function aiCleanText(rawText) {
     const model = getMemoModel();
     const prompt = AI_CLEAN_TEXT_PROMPT + '\n' + rawText;
 
-    const response = callOpenAI('あなたは日本語テキストを整形するアシスタントです。指示に従って整形したテキストのみを出力してください。', prompt, model, false);
+    const response = callGemini('あなたは日本語テキストを整形するアシスタントです。指示に従って整形したテキストのみを出力してください。', prompt, model, false);
 
     return {
       success: true,
