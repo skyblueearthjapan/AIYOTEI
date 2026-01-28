@@ -868,6 +868,19 @@
           </div>
         </div>
         <div class="modal-form-item">
+          <label class="modal-form-label">カテゴリ</label>
+          <select class="modal-form-input" id="modalEventColorKey">
+            <option value="health">医療・健康</option>
+            <option value="work">仕事</option>
+            <option value="family">家族・人付き合い</option>
+            <option value="finance">お金・手続き</option>
+            <option value="travel">旅行・移動</option>
+            <option value="fun">趣味・娯楽</option>
+            <option value="school">学校・学習</option>
+            <option value="other" selected>その他</option>
+          </select>
+        </div>
+        <div class="modal-form-item">
           <label class="modal-form-label">メモ</label>
           <textarea class="modal-form-textarea" id="modalEventMemo" placeholder="補足情報（任意）"></textarea>
         </div>
@@ -1111,8 +1124,7 @@
       // 日付詳細モーダル
       document.getElementById('dayDetailClose').addEventListener('click', () => hideModal('dayDetail'));
       document.getElementById('dayDetailAddEvent').addEventListener('click', () => {
-        hideModal('dayDetail');
-        document.getElementById('calendarTextInput').focus();
+        openManualEventModal(state.selectedDate);
       });
 
       // 予定編集モーダル
@@ -1602,8 +1614,35 @@
       document.getElementById('modalEventEndDate').value = endDate;
       document.getElementById('modalEventStartTime').value = data.start_time || '';
       document.getElementById('modalEventEndTime').value = data.end_time || '';
+      document.getElementById('modalEventColorKey').value = data.color_key || 'other';
       document.getElementById('modalEventMemo').value = data.memo || '';
 
+      // モーダルタイトルを設定
+      document.querySelector('#calendarModal .modal-title').textContent = '予定を登録';
+      state.isManualEntry = false;
+
+      document.getElementById('calendarModal').classList.add('show');
+    }
+
+    // 手動入力モーダルを開く
+    function openManualEventModal(dateStr) {
+      // フォームをクリアして選択日付をセット
+      document.getElementById('modalEventTitle').value = '';
+      document.getElementById('modalEventStartDate').value = dateStr || state.selectedDate || '';
+      document.getElementById('modalEventEndDate').value = dateStr || state.selectedDate || '';
+      document.getElementById('modalEventStartTime').value = '';
+      document.getElementById('modalEventEndTime').value = '';
+      document.getElementById('modalEventColorKey').value = 'other';
+      document.getElementById('modalEventMemo').value = '';
+
+      // モーダルタイトルを設定
+      document.querySelector('#calendarModal .modal-title').textContent = '予定を追加（手入力）';
+      state.isManualEntry = true;
+      state.pendingEventData = null;
+      state.pendingEventRaw = '';
+
+      // 日付詳細モーダルを閉じて入力モーダルを開く
+      hideModal('dayDetail');
       document.getElementById('calendarModal').classList.add('show');
     }
 
@@ -1882,15 +1921,19 @@
         endDate = tmp;
       }
 
+      // カテゴリはフォームから取得（手動入力対応）
+      const selectedColorKey = document.getElementById('modalEventColorKey').value;
+      const title = document.getElementById('modalEventTitle').value.trim();
+
       const eventData = {
-        title: document.getElementById('modalEventTitle').value.trim(),
+        title: title,
         start_date: startDate,
         end_date: endDate,
         start_time: document.getElementById('modalEventStartTime').value || null,
         end_time: document.getElementById('modalEventEndTime').value || null,
         memo: document.getElementById('modalEventMemo').value.trim() || null,
         all_day: !document.getElementById('modalEventStartTime').value,
-        color_key: state.pendingEventData?.color_key || guessColorKeyFromTitle(document.getElementById('modalEventTitle').value.trim())
+        color_key: selectedColorKey || guessColorKeyFromTitle(title)
       };
 
       // タイトル必須チェック

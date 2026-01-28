@@ -185,7 +185,7 @@ function registerEvent(text, source) {
 /**
  * 予定を直接登録（フォームから編集済みデータを受け取る）
  * @param {Object} eventData - イベントデータ（title, start_date, end_date, start_time, end_time, memo, all_day）
- * @param {string} rawText - 元の入力テキスト
+ * @param {string} rawText - 元の入力テキスト（手動入力の場合は空文字列）
  * @returns {Object}
  */
 function registerEventDirect(eventData, rawText) {
@@ -210,8 +210,11 @@ function registerEventDirect(eventData, rawText) {
       eventData.end_date = tmp;
     }
 
+    // ソースを判定（rawTextがあればtext、なければmanual）
+    const source = rawText && rawText.trim() ? 'text' : 'manual';
+
     // DBに登録（生成されたevent_idが返る）
-    const eventId = insertEventToDB(eventData, rawText || '', 'text');
+    const eventId = insertEventToDB(eventData, rawText || '', source);
 
     return {
       success: true,
