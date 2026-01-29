@@ -13,9 +13,10 @@
  * @param {string} userMessage - ユーザーメッセージ
  * @param {string} model - 使用モデル
  * @param {boolean} jsonMode - JSONモードを有効にするか
+ * @param {number} temperature - 温度設定（0.0-1.0、デフォルト0.3）
  * @returns {string} AIの応答テキスト
  */
-function callGemini(systemPrompt, userMessage, model, jsonMode = false) {
+function callGemini(systemPrompt, userMessage, model, jsonMode = false, temperature = 0.3) {
   const apiKey = getGeminiApiKey();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
@@ -30,7 +31,7 @@ function callGemini(systemPrompt, userMessage, model, jsonMode = false) {
       parts: [{ text: systemPrompt }]
     },
     generationConfig: {
-      temperature: 0.3
+      temperature: temperature
     }
   };
 
@@ -171,26 +172,54 @@ function getCalendarSystemPrompt() {
 // Memo用プロンプト
 // ===========================================
 
-const MEMO_SYSTEM_PROMPT = `あなたは音声入力テキストを自然な文章に整形するアシスタントです。
+const MEMO_SYSTEM_PROMPT = `あなたは音声メモをクリエイティブに整理・まとめ直すAIアシスタントです。
 
 ## 目的
-音声メモに含まれる雑音を除去し、自然な文章に整える
+ユーザーが話した内容を深く理解し、より価値のある形にまとめ直す
 
-## やること
-- フィラーの削除（「えー」「あのー」「そのー」「えっと」等）
-- 言い直しの整理
-- 句読点・改行を最小限補正
-- 文末を自然に整える
+## あなたの4つの役割
 
-## やらないこと（厳守）
-- 要約しない
-- 箇条書きにしない
-- 意味を変えない
-- 情報を追加しない
-- フォーマットを変えない
+### 1. 深い理解
+- 話の表面だけでなく、意図や背景を汲み取る
+- ユーザーが本当に言いたかったことを理解する
+- 文脈から重要なポイントを見抜く
 
-## 出力
-整形済みのテキストのみを出力（説明文は付けない）`;
+### 2. クリエイティブな整理
+- 論理的な構造で情報を整理する
+- 必要に応じて箇条書きやカテゴリ分けを使う
+- 関連する内容をグループ化する
+- 時系列や優先度で並べ替える
+
+### 3. 註釈の追加
+- 【補足】として関連情報や背景知識を追記
+- 【注意】として気をつけるべき点を明示
+- 【ヒント】として役立つアドバイスを提案
+- 註釈は控えめに、本当に有用なものだけ追加
+
+### 4. まとめ直し
+- 冗長な部分を簡潔にまとめる
+- ポイントを明確に抽出する
+- 読みやすく、後で見返しやすい形式にする
+
+## フォーマット例
+
+【要点】
+・ポイント1
+・ポイント2
+
+【詳細】
+整理された本文...
+
+【補足】
+関連する追加情報...
+
+## 処理ルール
+- フィラー（「えー」「あのー」等）は自然に除去
+- 元の情報は漏らさず含める（削除しない）
+- 追加する註釈は【】で明示して区別する
+- 出力はまとめたテキストのみ（説明文は付けない）
+- 内容が短い場合は簡潔にまとめる（無理に長くしない）`;
+
 
 // ===========================================
 // API呼び出しラッパー
@@ -274,14 +303,15 @@ function validateCalendarData(data, rawText) {
 }
 
 /**
- * Memo用のテキスト整形
+ * Memo用のテキスト整形（クリエイティブAIまとめ）
  * @param {string} rawText - 音声入力の生テキスト
- * @returns {string} 整形済みテキスト
+ * @returns {string} 整理・まとめ直されたテキスト
  */
 function cleanMemoText(rawText) {
   const model = getMemoModel();
 
-  const response = callGemini(MEMO_SYSTEM_PROMPT, rawText, model, false);
+  // クリエイティブな出力のためtemperature 0.7を使用
+  const response = callGemini(MEMO_SYSTEM_PROMPT, rawText, model, false, 0.7);
 
   // 余分な空白を整理
   return response.trim();
@@ -291,19 +321,25 @@ function cleanMemoText(rawText) {
 // 音声文字起こし整形（Webアプリから呼び出し）
 // ===========================================
 
-const AI_CLEAN_TEXT_PROMPT = `次の日本語の音声書き起こしを、意味を変えずに読みやすく整えてください。
+const AI_CLEAN_TEXT_PROMPT = `次の音声書き起こしを、クリエイティブに整理してまとめ直してください。
 
-条件:
-- 「えー」「あのー」「そのー」「えっと」などのフィラーや言い直しを自然に除去
-- 箇条書き（・や-など）を勝手に追加しない（原文にある場合のみ許可）
-- 文章は短めの段落で区切るのはOK
-- フォーマット固定はしない（自然文のまま）
-- 意味や内容を変えない
+## あなたの役割
+1. 深い理解: 話の意図や背景を汲み取る
+2. クリエイティブな整理: 論理的な構造化・箇条書き・カテゴリ分け
+3. 註釈追加: 【補足】【注意】【ヒント】として有用な情報を追記
+4. まとめ直し: 要約やポイント抽出
+
+## 処理ルール
+- フィラー（「えー」「あのー」等）は除去
+- 元の情報は漏らさず含める
+- 追加する註釈は【】で明示
+- 内容が短い場合は簡潔に
 
 テキスト:`;
 
 /**
  * 音声文字起こしテキストを整形（Webアプリから呼び出し）
+ * クリエイティブAIまとめ機能
  * @param {string} rawText - 音声入力の生テキスト
  * @returns {Object} { success: boolean, cleanedText: string, error?: string }
  */
@@ -317,7 +353,8 @@ function aiCleanText(rawText) {
     const model = getMemoModel();
     const prompt = AI_CLEAN_TEXT_PROMPT + '\n' + rawText;
 
-    const response = callGemini('あなたは日本語テキストを整形するアシスタントです。指示に従って整形したテキストのみを出力してください。', prompt, model, false);
+    // クリエイティブな出力のためtemperature 0.7を使用
+    const response = callGemini('あなたは音声メモをクリエイティブに整理・まとめ直すAIアシスタントです。指示に従って整理・まとめ直したテキストのみを出力してください。', prompt, model, false, 0.7);
 
     return {
       success: true,
