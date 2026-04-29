@@ -134,6 +134,24 @@
     const dows = ['日','月','火','水','木','金','土'];
     return `${y}年${m}月${d}日（${dows[dt.getDay()]}）`;
   }
+  // 1日のイベントを時刻順にソート（終日 → 早い時刻 → 遅い時刻）
+  function sortEventsByTime(events) {
+    return [...events].sort((a, b) => {
+      const aTime = a.start_time || '';
+      const bTime = b.start_time || '';
+      if (!aTime && !bTime) return 0;
+      if (!aTime) return -1;
+      if (!bTime) return 1;
+      return aTime.localeCompare(bTime);
+    });
+  }
+  function sortEventsMap(eventsMap) {
+    const out = {};
+    for (const k in eventsMap) {
+      out[k] = sortEventsByTime(eventsMap[k] || []);
+    }
+    return out;
+  }
   function buildMonthGrid(year, month, todayK) {
     const first = new Date(year, month - 1, 1);
     const startDow = first.getDay();
@@ -1091,7 +1109,7 @@
         // getCalendarDataはsuccess無し・常にevents/holidays/rokuyoを返す仕様
         if (res && (res.events !== undefined || res.holidays !== undefined)) {
           setCalendarData({
-            events: res.events || {},
+            events: sortEventsMap(res.events || {}),
             holidays: res.holidays || {},
             rokuyo: res.rokuyo || {},
           });
