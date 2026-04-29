@@ -1105,16 +1105,35 @@
     const loadCalendar = useCallback(async (y, m) => {
       setCalLoading(true);
       try {
-        const res = await rpc('getCalendarData', y, m);
-        // getCalendarDataはsuccess無し・常にevents/holidays/rokuyoを返す仕様
-        if (res && (res.events !== undefined || res.holidays !== undefined)) {
+        // 前月・当月・翌月の3ヶ月を並列取得（カレンダーグリッドに映る範囲をカバー）
+        const shift = (yy, mm, delta) => {
+          let nm = mm + delta, ny = yy;
+          while (nm < 1) { nm += 12; ny--; }
+          while (nm > 12) { nm -= 12; ny++; }
+          return [ny, nm];
+        };
+        const [prevY, prevM] = shift(y, m, -1);
+        const [nextY, nextM] = shift(y, m, +1);
+        const results = await Promise.all([
+          rpc('getCalendarData', prevY, prevM).catch(() => null),
+          rpc('getCalendarData', y, m),
+          rpc('getCalendarData', nextY, nextM).catch(() => null),
+        ]);
+        const merged = { events: {}, holidays: {}, rokuyo: {} };
+        let gotAny = false;
+        for (const res of results) {
+          if (!res) continue;
+          if (res.events) Object.assign(merged.events, res.events);
+          if (res.holidays) Object.assign(merged.holidays, res.holidays);
+          if (res.rokuyo) Object.assign(merged.rokuyo, res.rokuyo);
+          if (res.events !== undefined || res.holidays !== undefined) gotAny = true;
+        }
+        if (gotAny) {
           setCalendarData({
-            events: sortEventsMap(res.events || {}),
-            holidays: res.holidays || {},
-            rokuyo: res.rokuyo || {},
+            events: sortEventsMap(merged.events),
+            holidays: merged.holidays,
+            rokuyo: merged.rokuyo,
           });
-        } else if (res && res.error) {
-          showToast(res.error);
         } else {
           showToast('カレンダー取得失敗');
         }
