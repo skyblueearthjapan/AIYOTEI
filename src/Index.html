@@ -537,8 +537,8 @@
     useEffect(() => {
       if (mode === 'edit' && eventId) {
         rpc('getEventData', eventId).then(res => {
-          if (res && res.success && res.eventData) {
-            const e = res.eventData;
+          const e = res && (res.event || res.eventData);
+          if (res && res.success && e) {
             setForm({
               title: e.title || '',
               start_date: e.start_date || todayKey(),
@@ -1088,14 +1088,17 @@
       setCalLoading(true);
       try {
         const res = await rpc('getCalendarData', y, m);
-        if (res && res.success) {
+        // getCalendarDataはsuccess無し・常にevents/holidays/rokuyoを返す仕様
+        if (res && (res.events !== undefined || res.holidays !== undefined)) {
           setCalendarData({
             events: res.events || {},
             holidays: res.holidays || {},
             rokuyo: res.rokuyo || {},
           });
+        } else if (res && res.error) {
+          showToast(res.error);
         } else {
-          showToast(res && res.error ? res.error : 'カレンダー取得失敗');
+          showToast('カレンダー取得失敗');
         }
       } catch (e) {
         showToast('読込エラー: ' + (e.message || e));
@@ -1104,8 +1107,9 @@
 
     useEffect(() => {
       rpc('getInitialData').then(res => {
-        if (res && res.success) {
-          const t = res.today || todayKey();
+        // getInitialDataはsuccess無し・{today, year, month, day}を返す仕様
+        if (res && res.today) {
+          const t = res.today;
           const y = res.year || new Date().getFullYear();
           const m = res.month || new Date().getMonth() + 1;
           setToday(t); setYear(y); setMonth(m); setSelectedDate(t);
