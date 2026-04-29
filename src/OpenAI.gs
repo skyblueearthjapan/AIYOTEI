@@ -18,6 +18,7 @@
  */
 function callGemini(systemPrompt, userMessage, model, jsonMode = false, temperature = 0.3) {
   const apiKey = getGeminiApiKey();
+  console.log(`[callGemini] model=${model} keyTail=...${String(apiKey).slice(-6)} jsonMode=${jsonMode}`);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const payload = {
@@ -47,23 +48,42 @@ function callGemini(systemPrompt, userMessage, model, jsonMode = false, temperat
     muteHttpExceptions: true
   };
 
-  const response = UrlFetchApp.fetch(url, options);
-  const responseCode = response.getResponseCode();
-  const responseText = response.getContentText();
+  // リトライ設定：429/500/503は指数バックオフで最大4回試行
+  const MAX_ATTEMPTS = 4;
+  const RETRY_STATUSES = [429, 500, 502, 503, 504];
+  let lastResponseCode = 0;
+  let lastResponseText = '';
 
-  if (responseCode !== 200) {
-    console.error('Gemini API Error:', responseText);
-    throw new Error(`Gemini APIエラー (${responseCode}): ${parseGeminiError(responseText)}`);
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+
+    if (responseCode === 200) {
+      const result = JSON.parse(responseText);
+      if (result.candidates && result.candidates[0] && result.candidates[0].content) {
+        return result.candidates[0].content.parts[0].text;
+      }
+      throw new Error('Gemini APIから有効なレスポンスが返されませんでした');
+    }
+
+    lastResponseCode = responseCode;
+    lastResponseText = responseText;
+
+    // リトライ可能なエラーかつ最終試行でない場合は待機して再試行
+    if (RETRY_STATUSES.indexOf(responseCode) >= 0 && attempt < MAX_ATTEMPTS) {
+      const waitMs = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
+      console.warn(`Gemini API ${responseCode} (attempt ${attempt}/${MAX_ATTEMPTS}) - retry in ${waitMs}ms`);
+      Utilities.sleep(waitMs);
+      continue;
+    }
+
+    // リトライ不可エラー、または最終試行失敗
+    break;
   }
 
-  const result = JSON.parse(responseText);
-
-  // Geminiのレスポンス形式からテキストを抽出
-  if (result.candidates && result.candidates[0] && result.candidates[0].content) {
-    return result.candidates[0].content.parts[0].text;
-  }
-
-  throw new Error('Gemini APIから有効なレスポンスが返されませんでした');
+  console.error('Gemini API Error:', lastResponseText);
+  throw new Error(`Gemini APIエラー (${lastResponseCode}): ${parseGeminiError(lastResponseText)}`);
 }
 
 /**
@@ -365,6 +385,214 @@ function aiCleanText(rawText) {
     return {
       success: false,
       cleanedText: '',
+      error: error.message
+    };
+  }
+}
+
+// ===========================================
+// ノート用 3段階AIパイプライン
+// ===========================================
+
+// --- Stage 1: 文字起こしクリーンアップ ---
+const NOTE_STAGE1_PROMPT = `あなたは文字起こし校正者です。
+
+## 目的
+音声認識テキストを、意味を変えずに読みやすく整える。
+忠実性を最優先し、要約・再構成・情報追加はしない。
+
+## 処理内容
+1. フィラーの除去（「えー」「あー」「えっと」「まあ」「なんか」「あのー」「うーん」等）
+2. 音声認識による明らかな誤変換のみ修正する
+3. 句読点を適切に補う
+4. 文法を最小限だけ整える
+5. 不自然な重複や言い直しを整理する
+6. 原文の文順は基本的に維持する
+
+## 保持すべき情報（必ず残す）
+- 人名・固有名詞
+- 日付・時刻
+- 数量・金額
+- 期限
+- 否定表現（〜しない、〜ではない）
+- 不確実表現(たぶん、かも、未定、検討中)
+- 比較表現(増えた、減った、前回より)
+
+## 禁止事項
+- 情報の追加（原文にない内容を足さない）
+- 情報の削除（原文にある内容を消さない）
+- 意味の言い換え（口語接続を綺麗にしすぎない）
+- 構造化(箇条書き化、見出し化をしない)
+- 原文にない断定表現への変更
+- 文の意味・因果・時制・主語を推測して補わない
+- 曖昧な表現は曖昧なまま残す
+- 要約しない、段落を再編しない
+
+## 出力
+校正後テキストのみを返す（説明文は付けない）`;
+
+// --- Stage 2: 構造化・まとめ ---
+const NOTE_STAGE2_PROMPT = `あなたは編集者です。
+
+## 目的
+校正済みテキストを読み、内容に最も適した形式に整理する。
+原文の情報を過不足なく整理し、推測で補完しない。
+
+## 分類ルール（上から順に判定）
+1. 実行すべき項目の列挙が中心 → A: TODO・タスク系
+2. 複数人の議論・決定・相談が中心 → B: 会議・相談系
+3. 発想・提案・構想・改善案が中心 → C: アイデア・企画系
+4. 出来事・状況説明・経過報告が中心 → D: 報告・記録系
+5. 短い覚書・断片的メモ・分類困難な短文 → E: メモ・雑記
+
+## AとEの違い
+- A: 実行すべき項目が中心（例：「牛乳、洗剤、電球買う」）
+- E: 単なる覚書・感想・参照情報（例：「駅前のパン屋、火曜休み」）
+
+## 混在時の優先ルール
+- 会議内容の中にタスクが含まれる → Bを優先
+- アイデアの中に実行項目がある → Cを優先し、補足にアクションを記載
+- 判定が難しい短文 → E
+
+## 出力形式
+
+### A: TODO・タスク系
+□ タスク1
+□ タスク2
+□ タスク3
+
+### B: 会議・相談系
+【要点】
+・ポイント
+
+【決定事項】
+・決まったこと
+
+【アクション】
+・動詞で始める（原文に根拠があるもののみ）
+
+【課題】
+・未解決事項のみ
+
+### C: アイデア・企画系
+【概要】
+一言でまとめ
+
+【ポイント】
+1. ポイント
+
+【補足】
+追加情報
+
+### D: 報告・記録系
+【状況】
+何が起きたか
+
+【対応】
+何をしたか／すべきか
+
+【備考】
+補足情報
+
+### E: メモ・雑記
+・内容1
+・内容2
+
+## 共通ルール
+- 原文にない情報を追加しない
+- 期限・担当者・数値を推測で補わない
+- 原文にない期限は書かない（「来月まで」を「来月末」にしない等）
+- 決定事項と推測を混同しない
+- アクションは原文に根拠があるものだけ抽出する
+- 空になるセクションは無理に作らず省略する
+- 各項目は簡潔に1行ずつ記載する
+- 内容が短い場合は無理に構造化せず簡潔にまとめる
+
+## 出力
+最適な1パターンのみで構造化した結果を返す（説明文は付けない）`;
+
+// --- Stage 3: タイトル生成 ---
+const NOTE_STAGE3_PROMPT = `あなたはタイトル生成者です。
+
+## 目的
+内容の主題を短く表すタイトルを1つ生成する。
+本文の要約ではなく、主題のラベル化を行う。
+
+## ルール
+- できるだけ10文字以内にする
+- 必要な場合のみ15文字以内まで可
+- 内容の本質を表す名詞句にする
+- 日付や時刻は含めない
+- 「メモ」「ノート」「記録」単独は禁止
+- ただし「会議メモ」「買い物メモ」など内容語を含む複合語は可
+
+## 例
+- 買い物リストの内容 → 「買い物リスト」
+- プロジェクト会議の内容 → 「PJ会議メモ」
+- 引越しの準備タスク → 「引越し準備」
+- 新サービスのアイデア → 「新サービス案」
+- 体調についてのメモ → 「体調メモ」
+- 見積提出の確認 → 「見積提出確認」
+- 訪問看護シフトの修正 → 「訪看シフト修正」
+
+## 出力
+タイトルのみを返す（説明文・引用符・括弧は付けない）`;
+
+/**
+ * ノート用3段階AIパイプライン
+ * Stage 1: クリーンアップ → Stage 2: 構造化 → Stage 3: タイトル生成
+ * @param {string} rawText - 音声入力の生テキスト
+ * @param {string} currentTabName - 現在のタブ名（デフォルト名判定用）
+ * @param {number} noteId - ノートID（デフォルト名判定用）
+ * @returns {Object} { success, cleanedText, structuredText, title, autoTitle }
+ */
+function processNoteAI(rawText, currentTabName, noteId) {
+  try {
+    rawText = String(rawText || '').trim();
+    if (!rawText) {
+      return { success: true, cleanedText: '', structuredText: '', title: '', autoTitle: false };
+    }
+
+    const model = getMemoModel();
+
+    // --- Stage 1: クリーンアップ ---
+    console.log('Note AI Stage 1: Cleanup');
+    const stage1Result = callGemini(NOTE_STAGE1_PROMPT, rawText, model, false, 0.1);
+    const cleanedText = (stage1Result || '').trim();
+
+    // --- Stage 2: 構造化 ---
+    console.log('Note AI Stage 2: Structure');
+    const stage2Result = callGemini(NOTE_STAGE2_PROMPT, cleanedText, model, false, 0.5);
+    const structuredText = (stage2Result || '').trim();
+
+    // --- Stage 3: タイトル生成（デフォルト名の場合のみ） ---
+    let title = '';
+    let autoTitle = false;
+    const defaultNames = getDefaultNoteNames();
+    const isDefaultName = defaultNames.indexOf(currentTabName) >= 0;
+
+    if (isDefaultName && structuredText) {
+      console.log('Note AI Stage 3: Title generation');
+      const stage3Result = callGemini(NOTE_STAGE3_PROMPT, structuredText, model, false, 0.3);
+      title = (stage3Result || '').trim().substring(0, 20);
+      autoTitle = !!title;
+    }
+
+    return {
+      success: true,
+      cleanedText: cleanedText,
+      structuredText: structuredText,
+      title: title,
+      autoTitle: autoTitle
+    };
+  } catch (error) {
+    console.error('processNoteAI error:', error);
+    return {
+      success: false,
+      cleanedText: '',
+      structuredText: '',
+      title: '',
+      autoTitle: false,
       error: error.message
     };
   }

@@ -1,2400 +1,1235 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>AIカレンダー</title>
-  <style>
-    /* ===== リセット・基本 ===== */
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Mycalendar</title>
+<base target="_top">
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: #ecebe6;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: #1a1a1a;
+  }
+  body { min-height: 100vh; }
+  * { box-sizing: border-box; }
+  button { font-family: inherit; }
 
-    body {
-      font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
-      background: linear-gradient(135deg, #faf8f5 0%, #f5f0eb 100%);
-      min-height: 100vh;
-      color: #333;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    /* ===== ヘッダー ===== */
-    .header {
-      background: linear-gradient(135deg, #7986cb 0%, #5c6bc0 100%);
-      color: white;
-      padding: 16px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 2px 8px rgba(92, 107, 192, 0.3);
-    }
-
-    .header-title {
-      font-size: 18px;
-      font-weight: bold;
-    }
-
-    .header-date {
-      font-size: 12px;
-      opacity: 0.9;
-    }
-
-    /* ===== タブナビゲーション ===== */
-    .tab-nav {
-      display: flex;
-      background: white;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-
-    .tab-btn {
-      flex: 1;
-      padding: 14px;
-      border: none;
-      background: white;
-      font-size: 14px;
-      font-weight: bold;
-      color: #888;
-      cursor: pointer;
-      transition: all 0.2s;
-      position: relative;
-    }
-
-    .tab-btn.active {
-      color: #5c6bc0;
-    }
-
-    .tab-btn.active::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 20%;
-      width: 60%;
-      height: 3px;
-      background: #5c6bc0;
-      border-radius: 3px 3px 0 0;
-    }
-
-    /* ===== ページコンテナ ===== */
-    .page {
-      display: none;
-      padding: 16px;
-      padding-bottom: 100px;
-    }
-
-    .page.active {
-      display: block;
-    }
-
-    /* ===== 音声入力エリア ===== */
-    .voice-input-area {
-      background: white;
-      border-radius: 20px;
-      padding: 20px;
-      margin-bottom: 16px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-      text-align: center;
-    }
-
-    .mic-button {
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      border: none;
-      background: linear-gradient(135deg, #ff8a80 0%, #ff5252 100%);
-      color: white;
-      font-size: 28px;
-      cursor: pointer;
-      box-shadow: 0 4px 16px rgba(255, 82, 82, 0.4);
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 12px;
-    }
-
-    .mic-button:hover {
-      transform: scale(1.05);
-    }
-
-    .mic-button.recording {
-      background: linear-gradient(135deg, #ff5252 0%, #d32f2f 100%);
-      animation: pulse 1s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { box-shadow: 0 4px 16px rgba(255, 82, 82, 0.4); }
-      50% { box-shadow: 0 4px 24px rgba(255, 82, 82, 0.7); }
-    }
-
-    .voice-hint {
-      font-size: 12px;
-      color: #888;
-    }
-
-    .voice-status {
-      margin-top: 12px;
-      font-size: 13px;
-      color: #5c6bc0;
-      min-height: 20px;
-    }
-
-    /* ===== テキスト入力 ===== */
-    .text-input-area {
-      margin-top: 16px;
-      display: flex;
-      gap: 8px;
-    }
-
-    .text-input {
-      flex: 1;
-      padding: 12px 16px;
-      border: 2px solid #e0e0e0;
+  /* App container */
+  #app-shell {
+    width: 100%;
+    min-height: 100vh;
+    background: #fafaf7;
+    margin: 0 auto;
+    position: relative;
+    display: flex; flex-direction: column;
+    overflow-x: hidden;
+  }
+  @media (min-width: 768px) {
+    body { background: #ecebe6; padding: 24px 0; }
+    #app-shell {
+      max-width: 480px;
+      min-height: calc(100vh - 48px);
       border-radius: 24px;
-      font-size: 14px;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-
-    .text-input:focus {
-      border-color: #5c6bc0;
-    }
-
-    /* ===== 複数行入力欄 ===== */
-    .text-input-multi {
-      flex: 1;
-      padding: 12px 16px;
-      border: 2px solid #e0e0e0;
-      border-radius: 16px;
-      font-size: 14px;
-      outline: none;
-      transition: border-color 0.2s;
-      resize: none;
-      line-height: 1.5;
-      font-family: inherit;
-    }
-
-    .text-input-multi:focus {
-      border-color: #5c6bc0;
-    }
-
-    .send-btn {
-      padding: 12px 20px;
-      border: none;
-      border-radius: 24px;
-      background: linear-gradient(135deg, #7986cb 0%, #5c6bc0 100%);
-      color: white;
-      font-size: 14px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: transform 0.2s;
-    }
-
-    .send-btn:hover {
-      transform: scale(1.02);
-    }
-
-    .send-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    /* ===== カレンダー ===== */
-    .calendar-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-
-    .calendar-nav-btn {
-      width: 40px;
-      height: 40px;
-      border: none;
-      border-radius: 50%;
-      background: white;
-      font-size: 18px;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      transition: all 0.2s;
-    }
-
-    .calendar-nav-btn:hover {
-      background: #f5f5f5;
-    }
-
-    .calendar-month {
-      font-size: 20px;
-      font-weight: bold;
-      color: #333;
-    }
-
-    .calendar-grid {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-      overflow-x: auto;
-      overflow-y: hidden;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    .calendar-weekdays {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      background: #f8f8f8;
-      min-width: 320px;
-    }
-
-    .weekday {
-      padding: 10px 4px;
-      text-align: center;
-      font-size: 11px;
-      font-weight: bold;
-      color: #666;
-    }
-
-    .weekday:first-child { color: #e57373; }
-    .weekday:last-child { color: #64b5f6; }
-
-    .calendar-days {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      min-width: 320px;
-    }
-
-    .calendar-day {
-      min-height: 60px;
-      padding: 4px;
-      border-top: 1px solid #f0f0f0;
-      cursor: pointer;
-      transition: background 0.2s;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
       overflow: hidden;
     }
+  }
 
-    .calendar-day:hover {
-      background: #fafafa;
-    }
+  /* Splash */
+  #splash {
+    position: fixed; inset: 0;
+    background: #fafaf7;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+    transition: opacity 280ms ease;
+    color: #888; font-size: 14px; letter-spacing: 1.6px;
+    font-weight: 600;
+  }
+  #splash.hide { opacity: 0; pointer-events: none; }
 
-    .calendar-day.other-month {
-      opacity: 0.3;
-    }
+  /* Toast */
+  #toast {
+    position: fixed; left: 50%; bottom: 32px;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(26,26,26,0.92); color: #fff;
+    padding: 10px 18px; border-radius: 999px;
+    font-size: 13px; max-width: 80%;
+    opacity: 0; pointer-events: none; z-index: 10000;
+    transition: opacity 220ms ease, transform 220ms ease;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    .calendar-day.today {
-      background: #fff8e1;
-    }
+  /* Sync indicator */
+  #syncStatus {
+    position: fixed; right: 18px; top: 18px;
+    background: rgba(26,26,26,0.85); color: #fff;
+    padding: 6px 12px; border-radius: 999px;
+    font-size: 11px; opacity: 0; pointer-events: none; z-index: 10000;
+    transition: opacity 220ms ease;
+  }
+  #syncStatus.show { opacity: 1; }
+  #syncStatus.error { background: rgba(192,57,43,0.95); }
+  #syncStatus.success { background: rgba(45,106,79,0.92); }
 
-    .calendar-day.selected {
-      background: #e8eaf6;
-    }
-
-    .day-number {
-      font-size: 13px;
-      font-weight: bold;
-      margin-bottom: 2px;
-    }
-
-    .calendar-day:nth-child(7n+1) .day-number { color: #e57373; }
-    .calendar-day:nth-child(7n) .day-number { color: #64b5f6; }
-
-    .day-rokuyo {
-      font-size: 8px;
-      color: #999;
-      margin-bottom: 2px;
-    }
-
-    .day-events {
-      font-size: 9px;
-      overflow: hidden;
-    }
-
-    .day-event {
-      display: block;
-      max-width: 100%;
-      background: linear-gradient(135deg, #c5cae9 0%, #b3e5fc 100%);
-      color: #333;
-      padding: 1px 4px;
-      border-radius: 4px;
-      margin-bottom: 1px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .day-event-more {
-      font-size: 8px;
-      color: #666;
-      text-align: center;
-    }
-
-    /* ===== 土日・祝日の背景色 ===== */
-    .calendar-day.is-sat {
-      background: #fffde7; /* 薄い黄色 */
-    }
-    .calendar-day.is-sun,
-    .calendar-day.is-holiday {
-      background: #fff0f3; /* 薄いピンク */
-    }
-    .calendar-day.is-sat.today,
-    .calendar-day.is-sun.today,
-    .calendar-day.is-holiday.today {
-      background: linear-gradient(135deg, #fff8e1 50%, #fff0f3 50%);
-    }
-
-    /* ===== イベント色（カテゴリ別） ===== */
-    .day-event.event-color-health {
-      background: linear-gradient(135deg, #ffcdd2 0%, #f8bbd9 100%);
-    }
-    .day-event.event-color-work {
-      background: linear-gradient(135deg, #bbdefb 0%, #90caf9 100%);
-    }
-    .day-event.event-color-family {
-      background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
-    }
-    .day-event.event-color-finance {
-      background: linear-gradient(135deg, #fff9c4 0%, #fff59d 100%);
-    }
-    .day-event.event-color-travel {
-      background: linear-gradient(135deg, #b2ebf2 0%, #80deea 100%);
-    }
-    .day-event.event-color-fun {
-      background: linear-gradient(135deg, #e1bee7 0%, #ce93d8 100%);
-    }
-    .day-event.event-color-school {
-      background: linear-gradient(135deg, #ffe0b2 0%, #ffcc80 100%);
-    }
-    .day-event.event-color-other {
-      background: linear-gradient(135deg, #cfd8dc 0%, #b0bec5 100%);
-    }
-
-    /* ===== メモページ ===== */
-    .memo-date-nav {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 16px;
-    }
-
-    .memo-nav-btn {
-      width: 44px;
-      height: 44px;
-      border: none;
-      border-radius: 50%;
-      background: white;
-      font-size: 20px;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      transition: all 0.2s;
-    }
-
-    .memo-nav-btn:hover {
-      background: #f5f5f5;
-      transform: scale(1.05);
-    }
-
-    .memo-date-display {
-      font-size: 18px;
-      font-weight: bold;
-      color: #333;
-      padding: 8px 20px;
-      background: white;
-      border-radius: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    }
-
-    .memo-container {
-      background: white;
-      border-radius: 20px;
-      padding: 20px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-      margin-bottom: 16px;
-    }
-
-    .memo-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-
-    .memo-label {
-      font-size: 14px;
-      font-weight: bold;
-      color: #5c6bc0;
-    }
-
-    .copy-btn {
-      padding: 8px 16px;
-      border: none;
-      border-radius: 16px;
-      background: #f5f5f5;
-      color: #666;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .copy-btn:hover {
-      background: #e8e8e8;
-    }
-
-    .memo-text {
-      width: 100%;
-      height: calc(100vh - 380px);
-      min-height: 280px;
-      max-height: 500px;
-      padding: 16px;
-      border: 2px solid #f0f0f0;
-      border-radius: 16px;
-      font-size: 15px;
-      line-height: 1.8;
-      resize: none;
-      outline: none;
-      font-family: inherit;
-      background: rgba(255,255,255,0.95);
-      box-sizing: border-box;
-    }
-
-    .memo-text:focus {
-      border-color: rgba(93, 112, 201, 0.5);
-      box-shadow: 0 0 0 4px rgba(93, 112, 201, 0.1);
-    }
-
-    /* ===== 確認モーダル ===== */
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 1000;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-
-    .modal-overlay.show {
-      display: flex;
-    }
-
-    .modal {
-      background: white;
-      border-radius: 20px;
-      padding: 24px;
-      max-width: 400px;
-      width: 100%;
-      max-height: 80vh;
-      overflow-y: auto;
-    }
-
-    .modal-title {
-      font-size: 18px;
-      font-weight: bold;
-      margin-bottom: 16px;
-      color: #333;
-    }
-
-    .modal-content {
-      margin-bottom: 20px;
-    }
-
-    .modal-item {
-      margin-bottom: 12px;
-    }
-
-    .modal-item-label {
-      font-size: 11px;
-      color: #888;
-      margin-bottom: 4px;
-    }
-
-    .modal-item-value {
-      font-size: 14px;
-      color: #333;
-      padding: 8px 12px;
-      background: #f8f8f8;
-      border-radius: 8px;
-    }
-
-    .modal-buttons {
-      display: flex;
-      gap: 12px;
-    }
-
-    .modal-btn {
-      flex: 1;
-      padding: 14px;
-      border: none;
-      border-radius: 12px;
-      font-size: 14px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .modal-btn-cancel {
-      background: #f5f5f5;
-      color: #666;
-    }
-
-    .modal-btn-confirm {
-      background: linear-gradient(135deg, #7986cb 0%, #5c6bc0 100%);
-      color: white;
-    }
-
-    /* ===== モーダルフォーム ===== */
-    .modal-form-item {
-      margin-bottom: 16px;
-    }
-
-    .modal-form-row {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .modal-form-label {
-      display: block;
-      font-size: 12px;
-      color: #666;
-      margin-bottom: 6px;
-      font-weight: bold;
-    }
-
-    .modal-form-input {
-      width: 100%;
-      padding: 12px;
-      border: 2px solid #e0e0e0;
-      border-radius: 10px;
-      font-size: 14px;
-      outline: none;
-      transition: border-color 0.2s;
-      font-family: inherit;
-    }
-
-    .modal-form-input:focus {
-      border-color: #5c6bc0;
-    }
-
-    .modal-form-textarea {
-      width: 100%;
-      padding: 12px;
-      border: 2px solid #e0e0e0;
-      border-radius: 10px;
-      font-size: 14px;
-      outline: none;
-      min-height: 80px;
-      resize: vertical;
-      font-family: inherit;
-      transition: border-color 0.2s;
-    }
-
-    .modal-form-textarea:focus {
-      border-color: #5c6bc0;
-    }
-
-    /* ===== トースト ===== */
-    .toast {
-      position: fixed;
-      bottom: 100px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #333;
-      color: white;
-      padding: 12px 24px;
-      border-radius: 24px;
-      font-size: 14px;
-      opacity: 0;
-      transition: opacity 0.3s;
-      z-index: 2000;
-      pointer-events: none;
-    }
-
-    .toast.show {
-      opacity: 1;
-    }
-
-    /* ===== ローディング ===== */
-    .loading-overlay {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(255,255,255,0.8);
-      z-index: 3000;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .loading-overlay.show {
-      display: flex;
-    }
-
-    .loading-spinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid #e0e0e0;
-      border-top-color: #5c6bc0;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    /* ===== ミニローディング（AI処理中） ===== */
-    .mini-loading {
-      display: none;
-      position: fixed;
-      top: 70px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: linear-gradient(135deg, #7986cb 0%, #5c6bc0 100%);
-      color: white;
-      padding: 8px 20px;
-      border-radius: 20px;
-      font-size: 13px;
-      z-index: 2500;
-      box-shadow: 0 4px 12px rgba(92, 107, 192, 0.4);
-      align-items: center;
-      gap: 8px;
-    }
-
-    .mini-loading.show {
-      display: flex;
-    }
-
-    .mini-loading-spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    /* ===== 保存中インジケータ ===== */
-    .save-indicator {
-      display: none;
-      position: fixed;
-      bottom: 140px;
-      right: 20px;
-      background: #4caf50;
-      color: white;
-      padding: 6px 14px;
-      border-radius: 16px;
-      font-size: 12px;
-      z-index: 2500;
-      box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
-    }
-
-    .save-indicator.show {
-      display: block;
-    }
-
-    .save-indicator.error {
-      background: #f44336;
-    }
-
-    /* ===== 同期ステータスバッジ ===== */
-    .sync-status {
-      display: none;
-      position: fixed;
-      top: 70px;
-      right: 16px;
-      padding: 6px 12px;
-      border-radius: 12px;
-      font-size: 11px;
-      z-index: 2500;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.3s ease;
-    }
-
-    .sync-status.show {
-      display: flex;
-    }
-
-    .sync-status.syncing {
-      background: rgba(92, 107, 192, 0.9);
-      color: white;
-    }
-
-    .sync-status.synced {
-      background: rgba(76, 175, 80, 0.9);
-      color: white;
-    }
-
-    .sync-status.error {
-      background: rgba(244, 67, 54, 0.9);
-      color: white;
-    }
-
-    .sync-status.offline {
-      background: rgba(158, 158, 158, 0.9);
-      color: white;
-    }
-
-    .sync-spinner {
-      width: 12px;
-      height: 12px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-  </style>
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15); opacity: 0.7; } }
+</style>
 </head>
 <body>
+  <div id="splash">Mycalendar</div>
+  <div id="app-shell"><div id="root"></div></div>
+  <div id="toast"></div>
+  <div id="syncStatus"></div>
 
-  <!-- ヘッダー -->
-  <div class="header">
-    <div>
-      <div class="header-title">AIカレンダー</div>
-      <div class="header-date" id="headerDate"></div>
-    </div>
-  </div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
 
-  <!-- タブナビゲーション -->
-  <div class="tab-nav">
-    <button class="tab-btn active" data-page="calendar">カレンダー</button>
-    <button class="tab-btn" data-page="memo">メモ</button>
-  </div>
+  <script type="text/babel" data-presets="react">
+  const ACCENT = '#c8941d';
+  const APP_NAME = 'Mycalendar';
 
-  <!-- カレンダーページ -->
-  <div class="page active" id="page-calendar">
-    <!-- カレンダー -->
-    <div class="calendar-header">
-      <button class="calendar-nav-btn" id="prevMonthBtn">◀</button>
-      <div class="calendar-month" id="calendarMonth"></div>
-      <button class="calendar-nav-btn" id="nextMonthBtn">▶</button>
-    </div>
+  const EVENT_COLORS = {
+    work:     { bar: '#1a1a1a', tint: 'rgba(26,26,26,0.05)' },
+    personal: { bar: '#c8941d', tint: 'rgba(200,148,29,0.10)' },
+    health:   { bar: '#2d6a4f', tint: 'rgba(45,106,79,0.08)' },
+    finance:  { bar: '#9a3f2f', tint: 'rgba(154,63,47,0.08)' },
+    social:   { bar: '#5a6c8f', tint: 'rgba(90,108,143,0.10)' },
+  };
 
-    <div class="calendar-grid">
-      <div class="calendar-weekdays">
-        <div class="weekday">日</div>
-        <div class="weekday">月</div>
-        <div class="weekday">火</div>
-        <div class="weekday">水</div>
-        <div class="weekday">木</div>
-        <div class="weekday">金</div>
-        <div class="weekday">土</div>
-      </div>
-      <div class="calendar-days" id="calendarDays"></div>
-    </div>
+  const COLOR_KEY_TO_KIND = {
+    health: 'health', work: 'work', family: 'social',
+    finance: 'finance', travel: 'personal', fun: 'personal',
+    school: 'personal', other: 'personal',
+  };
+  const KIND_LABELS = {
+    work: '仕事', personal: 'プライベート', health: '健康',
+    finance: '家計', social: '交流',
+  };
+  const COLOR_KEY_OPTIONS = [
+    { key: 'work',    label: '仕事',     color: '#1a1a1a' },
+    { key: 'health',  label: '健康',     color: '#2d6a4f' },
+    { key: 'family',  label: '家族・交流', color: '#5a6c8f' },
+    { key: 'finance', label: '家計',     color: '#9a3f2f' },
+    { key: 'travel',  label: '旅行',     color: '#0077b6' },
+    { key: 'fun',     label: '趣味',     color: '#c8941d' },
+    { key: 'school',  label: '学校',     color: '#7b3fb6' },
+    { key: 'other',   label: 'その他',   color: '#888' },
+  ];
 
-    <!-- 音声入力（カレンダーの下） -->
-    <div class="voice-input-area" style="margin-top: 16px; margin-bottom: 0;">
-      <button class="mic-button" id="calendarMicBtn">🎤</button>
-      <div class="voice-hint">タップして予定を話す</div>
-      <div class="voice-status" id="calendarVoiceStatus"></div>
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function todayKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  }
+  function mapColorKeyToKind(k) { return COLOR_KEY_TO_KIND[k] || 'personal'; }
+  function jpMonthLabel(y, m) { return `${y}年${m}月`; }
+  function jpFullDate(dateKey) {
+    const [y, m, d] = dateKey.split('-').map(Number);
+    const dt = new Date(y, m-1, d);
+    const dows = ['日','月','火','水','木','金','土'];
+    return `${y}年${m}月${d}日（${dows[dt.getDay()]}）`;
+  }
+  function buildMonthGrid(year, month, todayK) {
+    const first = new Date(year, month - 1, 1);
+    const startDow = first.getDay();
+    const start = new Date(year, month - 1, 1 - startDow);
+    const days = [];
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const key = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+      days.push({
+        key, day: d.getDate(), dow: d.getDay(),
+        inMonth: d.getMonth() === month - 1,
+        isToday: key === todayK,
+      });
+    }
+    return days;
+  }
 
-      <!-- 予定入力欄（音声または手入力） -->
-      <div class="text-input-area" style="margin-top: 12px;">
-        <textarea class="text-input-multi" id="calendarTextInput" rows="3"
-          placeholder="音声入力または直接入力。修正してから登録できます。"></textarea>
-        <button class="send-btn" id="calendarSendBtn">登録</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- メモページ -->
-  <div class="page" id="page-memo">
-    <!-- 日付ナビ -->
-    <div class="memo-date-nav">
-      <button class="memo-nav-btn" id="prevDayBtn">◀</button>
-      <div class="memo-date-display" id="memoDateDisplay"></div>
-      <button class="memo-nav-btn" id="nextDayBtn">▶</button>
-    </div>
-
-    <!-- メモ表示・編集 -->
-    <div class="memo-container">
-      <div class="memo-header">
-        <div class="memo-label">📝 この日のメモ</div>
-        <div style="display: flex; gap: 8px;">
-          <button class="copy-btn" id="copyMemoBtn">コピー</button>
-          <button class="copy-btn" id="saveMemoBtn" style="background: #5c6bc0; color: white;" disabled>保存</button>
-        </div>
-      </div>
-      <textarea class="memo-text" id="memoText" placeholder="メモを入力してください..."></textarea>
-    </div>
-
-    <!-- 音声入力 -->
-    <div class="voice-input-area">
-      <button class="mic-button" id="memoMicBtn">🎤</button>
-      <div class="voice-hint">タップしてメモを追加</div>
-      <div class="voice-status" id="memoVoiceStatus"></div>
-      <div class="text-input-area">
-        <textarea class="text-input-multi" id="memoTextInput" rows="3"
-          placeholder="音声入力または直接入力。修正してから追記できます。"></textarea>
-        <button class="send-btn" id="memoSendBtn">追記</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 確認モーダル（カレンダー用・編集可能） -->
-  <div class="modal-overlay" id="calendarModal">
-    <div class="modal">
-      <div class="modal-title">予定を登録</div>
-      <div class="modal-content">
-        <div class="modal-form-item">
-          <label class="modal-form-label">タイトル</label>
-          <input type="text" class="modal-form-input" id="modalEventTitle" placeholder="予定のタイトル">
-        </div>
-        <div class="modal-form-row">
-          <div class="modal-form-item" style="flex:1">
-            <label class="modal-form-label">開始日</label>
-            <input type="date" class="modal-form-input" id="modalEventStartDate">
-          </div>
-          <div class="modal-form-item" style="flex:1">
-            <label class="modal-form-label">終了日</label>
-            <input type="date" class="modal-form-input" id="modalEventEndDate">
-          </div>
-        </div>
-        <div class="modal-form-row">
-          <div class="modal-form-item" style="flex:1">
-            <label class="modal-form-label">開始時刻</label>
-            <input type="time" class="modal-form-input" id="modalEventStartTime">
-          </div>
-          <div class="modal-form-item" style="flex:1">
-            <label class="modal-form-label">終了時刻</label>
-            <input type="time" class="modal-form-input" id="modalEventEndTime">
-          </div>
-        </div>
-        <div class="modal-form-item">
-          <label class="modal-form-label">カテゴリ</label>
-          <select class="modal-form-input" id="modalEventColorKey">
-            <option value="health">医療・健康</option>
-            <option value="work">仕事</option>
-            <option value="family">家族・人付き合い</option>
-            <option value="finance">お金・手続き</option>
-            <option value="travel">旅行・移動</option>
-            <option value="fun">趣味・娯楽</option>
-            <option value="school">学校・学習</option>
-            <option value="other" selected>その他</option>
-          </select>
-        </div>
-        <div class="modal-form-item">
-          <label class="modal-form-label">メモ</label>
-          <textarea class="modal-form-textarea" id="modalEventMemo" placeholder="補足情報（任意）"></textarea>
-        </div>
-      </div>
-      <div class="modal-buttons">
-        <button class="modal-btn modal-btn-cancel" id="calendarModalCancel">キャンセル</button>
-        <button class="modal-btn modal-btn-confirm" id="calendarModalConfirm">登録</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 確認モーダル（メモ用） -->
-  <div class="modal-overlay" id="memoModal">
-    <div class="modal">
-      <div class="modal-title">メモを追記しますか？</div>
-      <div class="modal-content" id="memoModalContent"></div>
-      <div class="modal-buttons">
-        <button class="modal-btn modal-btn-cancel" id="memoModalCancel">キャンセル</button>
-        <button class="modal-btn modal-btn-confirm" id="memoModalConfirm">追記</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 日付詳細モーダル -->
-  <div class="modal-overlay" id="dayDetailModal">
-    <div class="modal">
-      <div class="modal-title" id="dayDetailTitle">1月10日（土）</div>
-      <div class="modal-content" id="dayDetailContent">
-        <!-- 予定一覧がここに入る -->
-      </div>
-      <div class="modal-buttons">
-        <button class="modal-btn modal-btn-cancel" id="dayDetailClose">閉じる</button>
-        <button class="modal-btn modal-btn-confirm" id="dayDetailAddEvent">予定を追加</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 予定編集モーダル -->
-  <div class="modal-overlay" id="eventEditModal">
-    <div class="modal">
-      <div class="modal-title">予定を編集</div>
-      <div class="modal-content">
-        <input type="hidden" id="editEventId">
-        <div class="modal-form-item">
-          <label class="modal-form-label">タイトル</label>
-          <input type="text" class="modal-form-input" id="editEventTitle" placeholder="予定のタイトル">
-        </div>
-        <div class="modal-form-row">
-          <div class="modal-form-item" style="flex:1">
-            <label class="modal-form-label">開始日</label>
-            <input type="date" class="modal-form-input" id="editEventStartDate">
-          </div>
-          <div class="modal-form-item" style="flex:1">
-            <label class="modal-form-label">終了日</label>
-            <input type="date" class="modal-form-input" id="editEventEndDate">
-          </div>
-        </div>
-        <div class="modal-form-row">
-          <div class="modal-form-item" style="flex:1">
-            <label class="modal-form-label">開始時刻</label>
-            <input type="time" class="modal-form-input" id="editEventStartTime">
-          </div>
-          <div class="modal-form-item" style="flex:1">
-            <label class="modal-form-label">終了時刻</label>
-            <input type="time" class="modal-form-input" id="editEventEndTime">
-          </div>
-        </div>
-        <div class="modal-form-item">
-          <label class="modal-form-label">カテゴリ</label>
-          <select class="modal-form-input" id="editEventColorKey">
-            <option value="health">医療・健康</option>
-            <option value="work">仕事</option>
-            <option value="family">家族・人付き合い</option>
-            <option value="finance">お金・手続き</option>
-            <option value="travel">旅行・移動</option>
-            <option value="fun">趣味・娯楽</option>
-            <option value="school">学校・学習</option>
-            <option value="other">その他</option>
-          </select>
-        </div>
-        <div class="modal-form-item">
-          <label class="modal-form-label">メモ</label>
-          <textarea class="modal-form-textarea" id="editEventMemo" placeholder="補足情報（任意）"></textarea>
-        </div>
-      </div>
-      <div class="modal-buttons" style="flex-wrap: wrap; gap: 8px;">
-        <button class="modal-btn modal-btn-cancel" id="eventEditCancel">閉じる</button>
-        <button class="modal-btn" id="eventEditDelete" style="background: #ffcdd2; color: #c62828;">削除</button>
-        <button class="modal-btn modal-btn-confirm" id="eventEditSave">保存</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- トースト -->
-  <div class="toast" id="toast"></div>
-
-  <!-- ミニローディング（AI処理中） -->
-  <div class="mini-loading" id="miniLoading">
-    <div class="mini-loading-spinner"></div>
-    <span id="miniLoadingText">AI処理中...</span>
-  </div>
-
-  <!-- 保存インジケータ -->
-  <div class="save-indicator" id="saveIndicator">保存中...</div>
-
-  <!-- 同期ステータス -->
-  <div class="sync-status" id="syncStatus">
-    <div class="sync-spinner"></div>
-    <span id="syncStatusText">同期中...</span>
-  </div>
-
-  <!-- ローディング（初回読み込み用） -->
-  <div class="loading-overlay" id="loading">
-    <div class="loading-spinner"></div>
-  </div>
-
-  <script>
-    // ===== グローバル状態 =====
-    let state = {
-      today: null,
-      currentYear: null,
-      currentMonth: null,
-      selectedDate: null,
-      memoDate: null,
-      calendarData: { events: {}, rokuyo: {}, holidays: {} },
-      pendingEventData: null,
-      pendingMemoText: null,
-      pendingMemoRaw: null,
-      memoOriginalText: '',  // メモの変更検知用
-      // キャッシュ
-      cache: {
-        calendar: {},       // { "2026-01": { events, rokuyo, holidays, cachedAt } }
-        memos: {},          // { "2026-01-10": { text, cachedAt } }
-        lastSync: null      // 最終同期時刻
-      },
-      // 同期状態
-      syncPending: 0,       // 保留中の同期数
-      memoVersion: 0        // メモの競合防止用バージョン
-    };
-
-    // ===== 同期キュー =====
-    let syncQueue = [];
-    let isSyncing = false;
-
-    // ===== 無限ループ防止ガード =====
-    let __calendarLoading = false;
-    let __calendarRetry = 0;
-    let __memoLoading = false;
-    let __memoRetry = 0;
-    const MAX_RETRY = 3;
-    let __lastRenderKey = ''; // 同一月の再レンダー防止
-
-    // ===== 初期化 =====
-    let __initCalled = false;
-    document.addEventListener('DOMContentLoaded', init);
-
-    function init() {
-      // 二重初期化防止
-      if (__initCalled) {
-        console.warn('init() already called, skipping');
+  function rpc(method, ...args) {
+    return new Promise((resolve, reject) => {
+      if (typeof google === 'undefined' || !google.script || !google.script.run) {
+        reject(new Error('GAS環境ではありません'));
         return;
       }
-      __initCalled = true;
-      console.log('init() starting...');
-
-      // 初期データ取得
-      showLoading(true);
       google.script.run
-        .withSuccessHandler(function(data) {
-          console.log('getInitialData success:', data);
-          state.today = data.today;
-          state.currentYear = data.year;
-          state.currentMonth = data.month;
-          state.selectedDate = data.today;
-          state.memoDate = data.today;
-
-          updateHeaderDate();
-          loadCalendarDataSafe();
-          loadMemoDataSafe();
-        })
-        .withFailureHandler(function(error) {
-          console.error('getInitialData failed:', error);
-          showLoading(false);
-          showToast('初期化エラー。ページを再読み込みしてください。');
-        })
-        .getInitialData();
-
-      // イベントリスナー設定
-      setupEventListeners();
-    }
-
-    function setupEventListeners() {
-      // タブ切り替え
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => switchTab(btn.dataset.page));
-      });
-
-      // カレンダーナビゲーション
-      document.getElementById('prevMonthBtn').addEventListener('click', () => changeMonth(-1));
-      document.getElementById('nextMonthBtn').addEventListener('click', () => changeMonth(1));
-
-      // メモ日付ナビゲーション
-      document.getElementById('prevDayBtn').addEventListener('click', () => changeMemoDay(-1));
-      document.getElementById('nextDayBtn').addEventListener('click', () => changeMemoDay(1));
-
-      // カレンダー入力
-      document.getElementById('calendarSendBtn').addEventListener('click', handleCalendarInput);
-      // textareaなのでCtrl+Enterで送信
-      document.getElementById('calendarTextInput').addEventListener('keydown', e => {
-        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-          e.preventDefault();
-          handleCalendarInput();
-        }
-      });
-
-      // メモ入力
-      document.getElementById('memoSendBtn').addEventListener('click', handleMemoInput);
-      // textareaなのでCtrl+Enterで送信
-      document.getElementById('memoTextInput').addEventListener('keydown', e => {
-        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-          e.preventDefault();
-          handleMemoInput();
-        }
-      });
-
-      // コピーボタン
-      document.getElementById('copyMemoBtn').addEventListener('click', copyMemo);
-
-      // 保存ボタン
-      document.getElementById('saveMemoBtn').addEventListener('click', saveMemoText);
-
-      // メモテキストエリアの変更検知
-      document.getElementById('memoText').addEventListener('input', updateSaveButtonState);
-
-      // モーダル
-      document.getElementById('calendarModalCancel').addEventListener('click', () => hideModal('calendar'));
-      document.getElementById('calendarModalConfirm').addEventListener('click', confirmCalendarEvent);
-      document.getElementById('memoModalCancel').addEventListener('click', () => hideModal('memo'));
-      document.getElementById('memoModalConfirm').addEventListener('click', confirmMemoAppend);
-
-      // 日付詳細モーダル
-      document.getElementById('dayDetailClose').addEventListener('click', () => hideModal('dayDetail'));
-      document.getElementById('dayDetailAddEvent').addEventListener('click', () => {
-        openManualEventModal(state.selectedDate);
-      });
-
-      // 予定編集モーダル
-      document.getElementById('eventEditCancel').addEventListener('click', () => hideModal('eventEdit'));
-      document.getElementById('eventEditSave').addEventListener('click', saveEditedEvent);
-      document.getElementById('eventEditDelete').addEventListener('click', deleteEditedEvent);
-
-      // 音声入力（トグル式：タップで開始/停止）
-      document.getElementById('calendarMicBtn').addEventListener('click', () => toggleVoiceInput('calendar'));
-      document.getElementById('memoMicBtn').addEventListener('click', () => toggleVoiceInput('memo'));
-    }
-
-    // ===== タブ切り替え =====
-    function switchTab(page) {
-      // メモタブから離れる場合は未保存のメモを保存
-      const currentTab = document.querySelector('.tab-btn.active')?.dataset.page;
-      if (currentTab === 'memo' && page !== 'memo') {
-        flushMemoSave();
-      }
-
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.page === page);
-      });
-      document.querySelectorAll('.page').forEach(p => {
-        p.classList.toggle('active', p.id === 'page-' + page);
-      });
-    }
-
-    // ===== ヘッダー日付更新 =====
-    function updateHeaderDate() {
-      const d = new Date();
-      const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-      document.getElementById('headerDate').textContent =
-        `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}）`;
-    }
-
-    // ===== カレンダー =====
-    function loadCalendarDataSafe() {
-      if (__calendarLoading) return; // 二重起動防止
-
-      const year = state.currentYear;
-      const month = state.currentMonth;
-
-      // キャッシュがあれば先に表示（体感ゼロ秒）
-      const cached = getCalendarCache(year, month);
-      if (cached) {
-        state.calendarData = {
-          events: cached.events || {},
-          rokuyo: cached.rokuyo || {},
-          holidays: cached.holidays || {}
-        };
-        renderCalendar();
-        showLoading(false);
-        // バックグラウンドで更新
-        showSyncStatus('syncing', '更新中...');
-      }
-
-      __calendarLoading = true;
-
-      google.script.run
-        .withSuccessHandler(function(data) {
-          __calendarLoading = false;
-          __calendarRetry = 0; // 成功でリトライリセット
-
-          // dataがnullの場合のフォールバック
-          const calendarData = data || { events: {}, rokuyo: {}, holidays: {} };
-
-          // eventsやrokuyoがnullの場合も安全に処理
-          if (!calendarData.events) calendarData.events = {};
-          if (!calendarData.rokuyo) calendarData.rokuyo = {};
-          if (!calendarData.holidays) calendarData.holidays = {};
-
-          // キャッシュに保存
-          setCalendarCache(year, month, calendarData);
-
-          // 現在表示中の月と同じ場合のみ更新
-          if (state.currentYear === year && state.currentMonth === month) {
-            state.calendarData = calendarData;
-            renderCalendar();
-          }
-
-          showLoading(false);
-          if (cached) {
-            showSyncStatus('synced');
-          }
-        })
-        .withFailureHandler(function(error) {
-          __calendarLoading = false;
-          console.error("loadCalendarData failed:", error);
-          __calendarRetry++;
-
-          // キャッシュがあった場合はエラーでも継続
-          if (cached) {
-            showSyncStatus('error', '更新失敗');
-            return;
-          }
-
-          if (__calendarRetry >= MAX_RETRY) {
-            showLoading(false);
-            showToast("読み込みに失敗しました。ページを再読み込みしてください。");
-            return;
-          }
-          // 少し待ってからリトライ
-          setTimeout(loadCalendarDataSafe, 800);
-        })
-        .getCalendarData(year, month);
-    }
-
-    function changeMonth(delta) {
-      state.currentMonth += delta;
-      if (state.currentMonth > 12) {
-        state.currentMonth = 1;
-        state.currentYear++;
-      } else if (state.currentMonth < 1) {
-        state.currentMonth = 12;
-        state.currentYear--;
-      }
-      showLoading(true);
-      loadCalendarDataSafe();
-    }
-
-    function renderCalendar() {
-      try {
-        // nullチェック：データがまだ無い場合は何もしない
-        if (!state.currentYear || !state.currentMonth) {
-          console.warn('renderCalendar: state not ready');
-          return;
-        }
-
-        document.getElementById('calendarMonth').textContent =
-          `${state.currentYear}年${state.currentMonth}月`;
-
-        const container = document.getElementById('calendarDays');
-        if (!container) return;
-        container.innerHTML = '';
-
-      const firstDay = new Date(state.currentYear, state.currentMonth - 1, 1);
-      const lastDay = new Date(state.currentYear, state.currentMonth, 0);
-      const startDayOfWeek = firstDay.getDay();
-      const daysInMonth = lastDay.getDate();
-
-      // 前月の日を埋める
-      const prevMonth = new Date(state.currentYear, state.currentMonth - 1, 0);
-      for (let i = startDayOfWeek - 1; i >= 0; i--) {
-        const day = prevMonth.getDate() - i;
-        container.appendChild(createDayCell(day, true, prevMonth.getFullYear(), prevMonth.getMonth() + 1));
-      }
-
-      // 当月の日
-      for (let day = 1; day <= daysInMonth; day++) {
-        container.appendChild(createDayCell(day, false, state.currentYear, state.currentMonth));
-      }
-
-      // 次月の日を埋める
-      const totalCells = container.children.length;
-      const remainingCells = 42 - totalCells;
-      for (let day = 1; day <= remainingCells; day++) {
-        const nextMonth = state.currentMonth === 12 ? 1 : state.currentMonth + 1;
-        const nextYear = state.currentMonth === 12 ? state.currentYear + 1 : state.currentYear;
-        container.appendChild(createDayCell(day, true, nextYear, nextMonth));
-      }
-      } catch (e) {
-        console.error('renderCalendar crashed:', e);
-        // 無限ループ防止：再試行せずエラー表示のみ
-        showToast('カレンダー描画エラー。ページを再読み込みしてください。');
-      }
-    }
-
-    function createDayCell(day, isOtherMonth, year, month) {
-      const cell = document.createElement('div');
-      cell.className = 'calendar-day';
-      if (isOtherMonth) cell.classList.add('other-month');
-
-      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const dateObj = new Date(year, month - 1, day);
-      const dayOfWeek = dateObj.getDay(); // 0=日, 6=土
-
-      // 土曜・日曜のクラス
-      if (dayOfWeek === 0) cell.classList.add('is-sun');
-      if (dayOfWeek === 6) cell.classList.add('is-sat');
-
-      // 祝日チェック（holidayMapがあれば）
-      const holidayName = state.calendarData?.holidays?.[dateStr];
-      if (holidayName) cell.classList.add('is-holiday');
-
-      if (dateStr === state.today) cell.classList.add('today');
-      if (dateStr === state.selectedDate) cell.classList.add('selected');
-
-      // 日付番号
-      const dayNum = document.createElement('div');
-      dayNum.className = 'day-number';
-      dayNum.textContent = day;
-      cell.appendChild(dayNum);
-
-      // 六曜（安全なnullガード付き）
-      const rokuyoText = state.calendarData?.rokuyo?.[dateStr] ?? '';
-      if (rokuyoText) {
-        const rokuyo = document.createElement('div');
-        rokuyo.className = 'day-rokuyo';
-        rokuyo.textContent = rokuyoText;
-        cell.appendChild(rokuyo);
-      }
-
-      // イベント（安全なnullガード付き）
-      const MAX_EVENTS_PER_DAY = 3;
-      const dayEvents = state.calendarData?.events?.[dateStr];
-      if (dayEvents && dayEvents.length > 0) {
-        const eventsDiv = document.createElement('div');
-        eventsDiv.className = 'day-events';
-        dayEvents.slice(0, MAX_EVENTS_PER_DAY).forEach(evt => {
-          const eventEl = document.createElement('div');
-          eventEl.className = 'day-event';
-          // color_keyを取得（なければタイトルから推測）
-          const colorKey = getEventColorKey(evt);
-          eventEl.classList.add('event-color-' + colorKey);
-          eventEl.textContent = evt?.title ?? '';
-          eventsDiv.appendChild(eventEl);
-        });
-        if (dayEvents.length > MAX_EVENTS_PER_DAY) {
-          const more = document.createElement('div');
-          more.className = 'day-event-more';
-          more.textContent = `+${dayEvents.length - MAX_EVENTS_PER_DAY}件`;
-          eventsDiv.appendChild(more);
-        }
-        cell.appendChild(eventsDiv);
-      }
-
-      cell.addEventListener('click', () => {
-        state.selectedDate = dateStr;
-        renderCalendar();
-        openDayDetailModal(dateStr);
-      });
-
-      return cell;
-    }
-
-    // ===== メモ =====
-    function loadMemoDataSafe() {
-      if (__memoLoading) return; // 二重起動防止
-      __memoLoading = true;
-
-      document.getElementById('memoDateDisplay').textContent = formatDateJP(state.memoDate);
-
-      google.script.run
-        .withSuccessHandler(function(data) {
-          __memoLoading = false;
-          __memoRetry = 0; // 成功でリトライリセット
-          const memoText = data.text || '';
-          document.getElementById('memoText').value = memoText;
-          state.memoOriginalText = memoText;  // 変更検知用に保存
-          updateSaveButtonState();  // 保存ボタン状態をリセット
-        })
-        .withFailureHandler(function(error) {
-          __memoLoading = false;
-          console.error("loadMemoData failed:", error);
-          __memoRetry++;
-          if (__memoRetry >= MAX_RETRY) {
-            showToast("メモ読み込みに失敗しました。");
-            return;
-          }
-          // 少し待ってからリトライ
-          setTimeout(loadMemoDataSafe, 800);
-        })
-        .getMemoData(state.memoDate);
-    }
-
-    function changeMemoDay(delta) {
-      // 日付を変える前に未保存のメモを保存
-      flushMemoSave();
-
-      const d = toLocalDate(state.memoDate);
-      d.setDate(d.getDate() + delta);
-      state.memoDate = toDateString(d);
-      loadMemoDataSafe();
-    }
-
-    // YYYY-MM-DD文字列 → ローカル日付（UTC解釈を防ぐ）
-    function toLocalDate(dateStr) {
-      const [y, m, d] = dateStr.split('-').map(Number);
-      return new Date(y, m - 1, d);
-    }
-
-    // Date → YYYY-MM-DD文字列（ローカル時間で）
-    function toDateString(date) {
-      const y = date.getFullYear();
-      const m = String(date.getMonth() + 1).padStart(2, '0');
-      const d = String(date.getDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
-    }
-
-    function formatDateJP(dateStr) {
-      const d = toLocalDate(dateStr);
-      const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-      return `${d.getMonth() + 1}/${d.getDate()}（${weekdays[d.getDay()]}）`;
-    }
-
-    function formatDateISO(date) {
-      return toDateString(date);
-    }
-
-    function copyMemo() {
-      const text = document.getElementById('memoText').value;
-      if (!text) {
-        showToast('コピーするメモがありません');
-        return;
-      }
-      navigator.clipboard.writeText(text)
-        .then(() => showToast('コピーしました'))
-        .catch(() => showToast('コピーに失敗しました'));
-    }
-
-    // ===== メモ保存 =====
-    function updateSaveButtonState() {
-      const currentText = document.getElementById('memoText').value;
-      const isDirty = currentText !== state.memoOriginalText;
-      document.getElementById('saveMemoBtn').disabled = !isDirty;
-
-      // 変更があればデバウンス保存をスケジュール
-      if (isDirty) {
-        scheduleMemoAutoSave();
-      }
-    }
-
-    // ===== メモ自動保存（デバウンス） =====
-    let memoAutoSaveTimer = null;
-    const MEMO_AUTOSAVE_DELAY = 1500; // 1.5秒
-
-    function scheduleMemoAutoSave() {
-      if (memoAutoSaveTimer) {
-        clearTimeout(memoAutoSaveTimer);
-      }
-      memoAutoSaveTimer = setTimeout(() => {
-        saveMemoSilent();
-      }, MEMO_AUTOSAVE_DELAY);
-    }
-
-    function cancelMemoAutoSave() {
-      if (memoAutoSaveTimer) {
-        clearTimeout(memoAutoSaveTimer);
-        memoAutoSaveTimer = null;
-      }
-    }
-
-    // 即時保存（ナビゲーション前に呼ぶ）
-    function flushMemoSave() {
-      cancelMemoAutoSave();
-      const currentText = document.getElementById('memoText').value;
-      if (currentText !== state.memoOriginalText) {
-        saveMemoSilent();
-      }
-    }
-
-    // サイレント保存（トースト無し、ステータスバッジのみ）
-    function saveMemoSilent() {
-      const el = document.getElementById('memoText');
-      const currentText = el.value;
-
-      // 変更がなければスキップ
-      if (currentText === state.memoOriginalText) return;
-
-      // バージョンをインクリメント
-      const saveVersion = ++state.memoVersion;
-      const normalized = normalizeMemoText(currentText);
-
-      showSyncStatus('syncing', 'メモ保存中...');
-
-      google.script.run
-        .withSuccessHandler(function(result) {
-          // 保存中に別の変更があった場合はスキップ
-          if (state.memoVersion !== saveVersion) return;
-
-          if (result.success) {
-            state.memoOriginalText = normalized;
-            el.value = normalized; // UIも更新
-            updateSaveButtonState();
-            showSyncStatus('synced', 'メモ保存完了');
-          } else {
-            showSyncStatus('error', '保存失敗');
-          }
-        })
-        .withFailureHandler(function(error) {
-          if (state.memoVersion !== saveVersion) return;
-          console.error('saveMemo failed:', error);
-          showSyncStatus('error', 'メモ保存失敗');
-        })
-        .saveMemo(state.memoDate, normalized);
-    }
-
-    // メモテキスト整形（黒点は付けない、改行だけ整える）
-    function normalizeMemoText(text) {
-      if (!text) return '';
-
-      // 前後の空白を整え、改行を統一
-      let t = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-
-      // 連続しすぎる空行だけ抑える（3行以上→2行まで）
-      t = t.replace(/\n{3,}/g, '\n\n');
-
-      return t;
-    }
-
-    function saveMemoText() {
-      const el = document.getElementById('memoText');
-      // 整形（黒点は付けない）
-      const normalized = normalizeMemoText(el.value);
-      el.value = normalized;  // UI上も整った形にする
-
-      showLoading(true);
-
-      google.script.run
-        .withSuccessHandler(function(result) {
-          showLoading(false);
-          if (result.success) {
-            showToast(result.message);
-            state.memoOriginalText = normalized;  // 保存後に原本を更新
-            updateSaveButtonState();  // ボタン状態を更新
-          } else {
-            showToast('エラー: ' + result.error);
-          }
-        })
-        .withFailureHandler(function(error) {
-          showLoading(false);
-          console.error('saveMemo failed:', error);
-          showToast('保存に失敗しました');
-        })
-        .saveMemo(state.memoDate, normalized);
-    }
-
-    // ===== 入力処理 =====
-    function handleCalendarInput() {
-      const input = document.getElementById('calendarTextInput');
-      const text = input.value.trim();
-      if (!text) return;
-
-      // ミニローディング表示（画面は操作可能）
-      showMiniLoading(true, 'AI解析中...');
-      google.script.run
-        .withSuccessHandler(function(result) {
-          showMiniLoading(false);
-          if (result.success) {
-            state.pendingEventData = result.data;
-            state.pendingEventRaw = text;
-            showCalendarModal(result.data);
-          } else {
-            showToast('エラー: ' + result.error);
-          }
-        })
-        .withFailureHandler(function(error) {
-          showMiniLoading(false);
-          handleError(error);
-        })
-        .previewCalendarParse(text);
-    }
-
-    function handleMemoInput() {
-      const input = document.getElementById('memoTextInput');
-      const text = input.value.trim();
-      if (!text) return;
-
-      // ミニローディング表示（画面は操作可能）
-      showMiniLoading(true, 'AI整形中...');
-      google.script.run
-        .withSuccessHandler(function(result) {
-          showMiniLoading(false);
-          if (result.success) {
-            state.pendingMemoText = result.cleanedText;
-            state.pendingMemoRaw = text;
-            showMemoModal(result.cleanedText);
-          } else {
-            showToast('エラー: ' + result.error);
-          }
-        })
-        .withFailureHandler(function(error) {
-          showMiniLoading(false);
-          handleError(error);
-        })
-        .previewMemoCleaning(text);
-    }
-
-    // ===== モーダル =====
-    function showCalendarModal(data) {
-      // フォームにAI解析結果を初期値としてセット
-      document.getElementById('modalEventTitle').value = data.title || '';
-      const startDate = data.start_date || state.selectedDate || '';
-      const endDate = data.end_date || startDate; // end_dateがなければstart_dateと同じ
-      document.getElementById('modalEventStartDate').value = startDate;
-      document.getElementById('modalEventEndDate').value = endDate;
-      document.getElementById('modalEventStartTime').value = data.start_time || '';
-      document.getElementById('modalEventEndTime').value = data.end_time || '';
-      document.getElementById('modalEventColorKey').value = data.color_key || 'other';
-      document.getElementById('modalEventMemo').value = data.memo || '';
-
-      // モーダルタイトルを設定
-      document.querySelector('#calendarModal .modal-title').textContent = '予定を登録';
-      state.isManualEntry = false;
-
-      document.getElementById('calendarModal').classList.add('show');
-    }
-
-    // 手動入力モーダルを開く
-    function openManualEventModal(dateStr) {
-      // フォームをクリアして選択日付をセット
-      document.getElementById('modalEventTitle').value = '';
-      document.getElementById('modalEventStartDate').value = dateStr || state.selectedDate || '';
-      document.getElementById('modalEventEndDate').value = dateStr || state.selectedDate || '';
-      document.getElementById('modalEventStartTime').value = '';
-      document.getElementById('modalEventEndTime').value = '';
-      document.getElementById('modalEventColorKey').value = 'other';
-      document.getElementById('modalEventMemo').value = '';
-
-      // モーダルタイトルを設定
-      document.querySelector('#calendarModal .modal-title').textContent = '予定を追加（手入力）';
-      state.isManualEntry = true;
-      state.pendingEventData = null;
-      state.pendingEventRaw = '';
-
-      // 日付詳細モーダルを閉じて入力モーダルを開く
-      hideModal('dayDetail');
-      document.getElementById('calendarModal').classList.add('show');
-    }
-
-    function showMemoModal(cleanedText) {
-      let html = '';
-      html += createModalItem('日付', formatDateJP(state.memoDate));
-      html += createModalItem('整形後テキスト', cleanedText);
-      document.getElementById('memoModalContent').innerHTML = html;
-      document.getElementById('memoModal').classList.add('show');
-    }
-
-    function createModalItem(label, value) {
-      return `<div class="modal-item"><div class="modal-item-label">${label}</div><div class="modal-item-value">${escapeHtml(value)}</div></div>`;
-    }
-
-    function hideModal(type) {
-      document.getElementById(type + 'Modal').classList.remove('show');
-    }
-
-    // ===== 色カテゴリ判定 =====
-    // タイトルからcolor_keyを推測（フォールバック用）
-    function guessColorKeyFromTitle(title) {
-      if (!title) return 'other';
-      const t = title.toLowerCase();
-
-      // health: 医療・健康
-      if (/歯|病院|医|検診|薬|ジム|運動|美容|整体|マッサージ|健康/.test(t)) return 'health';
-      // work: 仕事
-      if (/会議|打ち合わせ|出張|面接|仕事|ミーティング|mtg|商談|取引/.test(t)) return 'work';
-      // family: 家族・人付き合い
-      if (/家族|友達|友人|デート|結婚|お見舞|親|母|父|子供|息子|娘|兄|姉|弟|妹|祖/.test(t)) return 'family';
-      // finance: お金・手続き
-      if (/銀行|役所|保険|税|契約|支払|振込|手続|届|申請|更新/.test(t)) return 'finance';
-      // travel: 旅行・移動
-      if (/旅行|帰省|引越|送迎|出発|到着|空港|駅|新幹線|飛行機/.test(t)) return 'travel';
-      // fun: 趣味・娯楽
-      if (/映画|コンサート|ライブ|飲み会|イベント|パーティ|遊び|カラオケ|ゲーム|スポーツ観戦/.test(t)) return 'fun';
-      // school: 学校・学習
-      if (/授業|試験|塾|習い事|PTA|学校|勉強|講座|セミナー|研修/.test(t)) return 'school';
-
-      return 'other';
-    }
-
-    // イベントのcolor_keyを取得（なければ推測）
-    function getEventColorKey(evt) {
-      if (evt?.color_key && evt.color_key !== 'other') {
-        return evt.color_key;
-      }
-      // color_keyがない、またはotherの場合はタイトルから推測
-      return guessColorKeyFromTitle(evt?.title);
-    }
-
-    // ===== 日付詳細モーダル =====
-    // color_key → グラデーション背景のマップ
-    const COLOR_KEY_GRADIENTS = {
-      health: 'linear-gradient(135deg, #ffcdd2 0%, #f8bbd9 100%)',
-      work: 'linear-gradient(135deg, #bbdefb 0%, #90caf9 100%)',
-      family: 'linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%)',
-      finance: 'linear-gradient(135deg, #fff9c4 0%, #fff59d 100%)',
-      travel: 'linear-gradient(135deg, #b2ebf2 0%, #80deea 100%)',
-      fun: 'linear-gradient(135deg, #e1bee7 0%, #ce93d8 100%)',
-      school: 'linear-gradient(135deg, #ffe0b2 0%, #ffcc80 100%)',
-      other: 'linear-gradient(135deg, #cfd8dc 0%, #b0bec5 100%)'
-    };
-
-    function openDayDetailModal(dateStr) {
-      const d = toLocalDate(dateStr);
-      const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-      const titleText = `${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}）`;
-      document.getElementById('dayDetailTitle').textContent = titleText;
-
-      // その日の予定を取得
-      const dayEvents = state.calendarData?.events?.[dateStr] || [];
-
-      // 祝日情報を取得
-      const holidayName = state.calendarData?.holidays?.[dateStr];
-
-      let contentHtml = '';
-
-      // 祝日表示
-      if (holidayName) {
-        contentHtml += `<div style="background: #fff0f3; color: #e57373; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; text-align: center; font-weight: bold;">🎌 ${escapeHtml(holidayName)}</div>`;
-      }
-
-      if (dayEvents.length === 0) {
-        contentHtml += '<div style="text-align: center; color: #888; padding: 20px;">予定がありません</div>';
-      } else {
-        contentHtml += '<div style="display: flex; flex-direction: column; gap: 12px;">';
-        dayEvents.forEach(evt => {
-          const timeStr = evt.start_time ? evt.start_time.substring(0, 5) : '終日';
-          const colorKey = getEventColorKey(evt);
-          const bgGradient = COLOR_KEY_GRADIENTS[colorKey] || COLOR_KEY_GRADIENTS.other;
-          const eventId = evt.event_id || '';
-          contentHtml += `
-            <div class="event-bar-clickable" data-event-id="${escapeHtml(eventId)}" style="background: ${bgGradient}; padding: 12px; border-radius: 12px; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s;">
-              <div style="font-size: 12px; color: #5c6bc0; font-weight: bold;">${timeStr}</div>
-              <div style="font-size: 14px; font-weight: bold; margin-top: 4px;">${escapeHtml(evt.title || '')}</div>
-              ${evt.memo ? `<div style="font-size: 12px; color: #666; margin-top: 4px;">${escapeHtml(evt.memo)}</div>` : ''}
+        .withSuccessHandler(resolve)
+        .withFailureHandler(err => reject(err instanceof Error ? err : new Error(String(err && err.message || err))))
+        [method](...args);
+    });
+  }
+  function showToast(msg, ms = 2400) {
+    const el = document.getElementById('toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(el.__timer);
+    el.__timer = setTimeout(() => el.classList.remove('show'), ms);
+  }
+  function showSync(state, msg) {
+    const el = document.getElementById('syncStatus');
+    if (!el) return;
+    el.classList.remove('error', 'success');
+    if (state) el.classList.add(state);
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(el.__timer);
+    el.__timer = setTimeout(() => el.classList.remove('show'), state === 'error' ? 4000 : 1600);
+  }
+
+  const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+  const navBtn = {
+    all: 'unset', cursor: 'pointer',
+    width: 30, height: 30, borderRadius: 999,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'rgba(0,0,0,0.04)',
+  };
+
+  function CalendarScreen({ year, month, evMap, holidays, rokuyo, onPrev, onNext, onSelectDate, selectedDate, todayK }) {
+    const grid = useMemo(() => buildMonthGrid(year, month, todayK), [year, month, todayK]);
+    const weeks = [];
+    for (let i = 0; i < 6; i++) weeks.push(grid.slice(i*7, i*7+7));
+    const dows = ['日','月','火','水','木','金','土'];
+
+    return (
+      <div style={{ padding: '0 10px 18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 6px 12px' }}>
+          <button onClick={onPrev} aria-label="前の月" style={navBtn}>
+            <svg width="9" height="14" viewBox="0 0 9 14"><path d="M7 1L1 7l6 6" stroke="#1a1a1a" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+          <div style={{ fontSize: 17, fontWeight: 500, color: '#1a1a1a', fontVariantNumeric: 'tabular-nums', letterSpacing: -0.3 }}>{jpMonthLabel(year, month)}</div>
+          <button onClick={onNext} aria-label="次の月" style={navBtn}>
+            <svg width="9" height="14" viewBox="0 0 9 14"><path d="M2 1l6 6-6 6" stroke="#1a1a1a" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '0 2px 6px' }}>
+          {dows.map((d, i) => (
+            <div key={d} style={{
+              textAlign: 'center', fontSize: 10.5, fontWeight: 600, letterSpacing: 1.2,
+              color: i === 0 ? '#c0392b' : i === 6 ? '#5a6c8f' : '#888',
+            }}>{d}</div>
+          ))}
+        </div>
+        <div style={{
+          display: 'grid', gridTemplateRows: 'repeat(6, 1fr)',
+          background: '#fff', borderRadius: 14, overflow: 'hidden',
+          border: '0.5px solid rgba(0,0,0,0.05)',
+        }}>
+          {weeks.map((week, wi) => (
+            <div key={wi} style={{
+              display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)',
+              borderBottom: wi < 5 ? '0.5px solid rgba(0,0,0,0.05)' : 'none',
+              minHeight: 76,
+            }}>
+              {week.map((cell, ci) => {
+                const evs = evMap[cell.key] || [];
+                const visible = evs.slice(0, 2);
+                const more = evs.length - visible.length;
+                const isHoliday = !!(holidays && holidays[cell.key]);
+                const dayColor = !cell.inMonth ? '#ccc'
+                  : isHoliday ? '#c0392b'
+                  : cell.dow === 0 ? '#c0392b'
+                  : cell.dow === 6 ? '#5a6c8f' : '#1a1a1a';
+                const isSelected = cell.key === selectedDate;
+                const bg = isSelected ? 'rgba(0,0,0,0.04)'
+                  : !cell.inMonth ? 'rgba(0,0,0,0.012)'
+                  : isHoliday ? '#fff5f5'
+                  : 'transparent';
+                return (
+                  <button key={ci} onClick={() => onSelectDate(cell.key)} style={{
+                    all: 'unset', cursor: 'pointer', boxSizing: 'border-box',
+                    padding: '6px 6px 4px', position: 'relative',
+                    borderRight: ci < 6 ? '0.5px solid rgba(0,0,0,0.05)' : 'none',
+                    background: bg,
+                    transition: 'background 120ms ease',
+                    overflow: 'hidden',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      {cell.isToday ? (
+                        <div style={{
+                          width: 22, height: 22, borderRadius: 999,
+                          background: '#1a1a1a', color: '#fff',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums',
+                        }}>{cell.day}</div>
+                      ) : (
+                        <div style={{
+                          fontSize: 12.5, fontWeight: cell.inMonth ? 500 : 400,
+                          color: dayColor, fontVariantNumeric: 'tabular-nums',
+                          padding: '2px 4px',
+                        }}>{cell.day}</div>
+                      )}
+                      {rokuyo && rokuyo[cell.key] && cell.inMonth && (
+                        <div style={{ fontSize: 8, color: '#bbb', letterSpacing: 0.2 }}>{rokuyo[cell.key]}</div>
+                      )}
+                    </div>
+                    <div style={{ marginTop: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {visible.map((ev, k) => {
+                        const kind = mapColorKeyToKind(ev.color_key);
+                        const c = EVENT_COLORS[kind];
+                        return (
+                          <div key={ev.event_id || k} style={{
+                            fontSize: 9.5, lineHeight: '12px',
+                            padding: '2px 4px', borderRadius: 3,
+                            background: c.tint, color: c.bar,
+                            fontWeight: 500,
+                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            borderLeft: `2px solid ${c.bar}`,
+                          }}>{ev.title}</div>
+                        );
+                      })}
+                      {more > 0 && (
+                        <div style={{ fontSize: 9, color: '#888', paddingLeft: 4 }}>+{more}件</div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-          `;
-        });
-        contentHtml += '</div>';
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function DayDetailPanel({ dateKey, events, holidays, onEditEvent, onCreateEvent }) {
+    const evs = events || [];
+    const holiday = holidays && holidays[dateKey];
+
+    return (
+      <div style={{ padding: '6px 18px 14px' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', padding: '14px 0 10px', gap: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1.4, color: '#888' }}>
+            🍀 {jpFullDate(dateKey)}{holiday ? `・${holiday}` : ''}
+          </div>
+          <div style={{ flex: 1, height: 1, background: 'rgba(0,0,0,0.07)', alignSelf: 'center' }}></div>
+          <div style={{ fontSize: 13.5, fontWeight: 500, color: ACCENT, fontVariantNumeric: 'tabular-nums' }}>{evs.length}件</div>
+        </div>
+        {evs.length === 0 ? (
+          <div style={{
+            background: '#fff', borderRadius: 14, padding: '22px 18px',
+            textAlign: 'center', color: '#aaa', fontSize: 13,
+            border: '0.5px solid rgba(0,0,0,0.05)',
+          }}>予定はありません。下のボタンから追加できます。</div>
+        ) : (
+          <div style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', border: '0.5px solid rgba(0,0,0,0.05)' }}>
+            {evs.map((ev, i) => {
+              const kind = mapColorKeyToKind(ev.color_key);
+              const c = EVENT_COLORS[kind];
+              return (
+                <button key={ev.event_id || i} onClick={() => onEditEvent(ev.event_id)} style={{
+                  all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '13px 16px', width: '100%', boxSizing: 'border-box',
+                  borderBottom: i < evs.length - 1 ? '0.5px solid rgba(0,0,0,0.06)' : 'none',
+                }}>
+                  <div style={{ width: 4, alignSelf: 'stretch', borderRadius: 2, background: c.bar }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 14.5, fontWeight: 500, color: '#1a1a1a',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>{ev.title}</div>
+                    <div style={{ fontSize: 11.5, color: '#888', marginTop: 2, display: 'flex', gap: 8, alignItems: 'center' }}>
+                      {ev.start_time && <span style={{ fontVariantNumeric: 'tabular-nums' }}>{ev.start_time}</span>}
+                      {ev.start_time && <span style={{ width: 2, height: 2, borderRadius: 1, background: 'rgba(0,0,0,0.2)' }} />}
+                      <span style={{
+                        fontSize: 10.5, padding: '1px 7px', borderRadius: 999,
+                        background: c.tint, color: c.bar, fontWeight: 600, letterSpacing: 0.4,
+                      }}>{KIND_LABELS[kind]}</span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <button onClick={() => onCreateEvent(dateKey)} style={{
+          all: 'unset', cursor: 'pointer', display: 'block', boxSizing: 'border-box',
+          width: '100%', textAlign: 'center', marginTop: 10,
+          padding: '11px 0', fontSize: 13, fontWeight: 500,
+          color: '#666', background: 'rgba(0,0,0,0.03)', borderRadius: 12,
+        }}>＋ 予定を手動で追加</button>
+      </div>
+    );
+  }
+
+  function CalendarVoiceModal({ open, onClose, defaultDate, onAdded }) {
+    const [listening, setListening] = useState(false);
+    const [transcript, setTranscript] = useState('');
+    const [parsed, setParsed] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const recogRef = useRef(null);
+    const supported = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+    useEffect(() => {
+      if (!open) {
+        setListening(false); setTranscript(''); setParsed(null); setBusy(false);
+        if (recogRef.current) try { recogRef.current.stop(); } catch (e) {}
       }
+    }, [open]);
 
-      document.getElementById('dayDetailContent').innerHTML = contentHtml;
-
-      // 予定バーにクリックイベントを設定
-      document.querySelectorAll('.event-bar-clickable').forEach(bar => {
-        bar.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const eventId = bar.dataset.eventId;
-          if (eventId) {
-            openEventEditModal(eventId);
-          }
-        });
-        // ホバー効果
-        bar.addEventListener('mouseenter', () => {
-          bar.style.transform = 'scale(1.02)';
-          bar.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-        });
-        bar.addEventListener('mouseleave', () => {
-          bar.style.transform = '';
-          bar.style.boxShadow = '';
-        });
-      });
-
-      document.getElementById('dayDetailModal').classList.add('show');
-    }
-
-    // ===== 予定編集モーダル =====
-    function openEventEditModal(eventId) {
-      showLoading(true);
-      google.script.run
-        .withSuccessHandler(function(result) {
-          showLoading(false);
-          if (result.success && result.event) {
-            const evt = result.event;
-            document.getElementById('editEventId').value = evt.event_id;
-            document.getElementById('editEventTitle').value = evt.title || '';
-            document.getElementById('editEventStartDate').value = evt.start_date || '';
-            document.getElementById('editEventEndDate').value = evt.end_date || evt.start_date || '';
-            document.getElementById('editEventStartTime').value = evt.start_time || '';
-            document.getElementById('editEventEndTime').value = evt.end_time || '';
-            document.getElementById('editEventColorKey').value = evt.color_key || 'other';
-            document.getElementById('editEventMemo').value = evt.memo || '';
-
-            // 日付詳細モーダルを閉じて編集モーダルを開く
-            hideModal('dayDetail');
-            document.getElementById('eventEditModal').classList.add('show');
-          } else {
-            showToast('予定の取得に失敗しました');
-          }
-        })
-        .withFailureHandler(function(error) {
-          showLoading(false);
-          console.error('getEventData failed:', error);
-          showToast('予定の取得に失敗しました');
-        })
-        .getEventData(eventId);
-    }
-
-    function saveEditedEvent() {
-      const eventId = document.getElementById('editEventId').value;
-      const title = document.getElementById('editEventTitle').value.trim();
-      let startDate = document.getElementById('editEventStartDate').value;
-      let endDate = document.getElementById('editEventEndDate').value || startDate;
-      const startTime = document.getElementById('editEventStartTime').value || null;
-      const endTime = document.getElementById('editEventEndTime').value || null;
-      const colorKey = document.getElementById('editEventColorKey').value;
-      const memo = document.getElementById('editEventMemo').value.trim();
-
-      if (!title) {
-        showToast('タイトルを入力してください');
-        return;
-      }
-      if (!startDate) {
-        showToast('日付を入力してください');
-        return;
-      }
-
-      // end_dateがstart_dateより前なら入れ替え
-      if (endDate < startDate) {
-        const tmp = startDate;
-        startDate = endDate;
-        endDate = tmp;
-      }
-
-      const payload = {
-        event_id: eventId,
-        title: title,
-        start_date: startDate,
-        end_date: endDate,
-        start_time: startTime,
-        end_time: endTime,
-        all_day: !startTime,
-        color_key: colorKey,
-        memo: memo || null
+    const start = () => {
+      setTranscript(''); setParsed(null);
+      if (!supported) { showToast('音声認識非対応：テキストで入力してください'); return; }
+      const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const r = new Rec();
+      r.lang = 'ja-JP'; r.interimResults = true; r.continuous = true;
+      let finalText = '';
+      r.onresult = (e) => {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+          else interim += e.results[i][0].transcript;
+        }
+        setTranscript((finalText + interim).trim());
       };
+      r.onerror = () => setListening(false);
+      r.onend = () => setListening(false);
+      recogRef.current = r;
+      r.start();
+      setListening(true);
+    };
 
-      // === Optimistic UI: 即座にカレンダーに反映 ===
-      hideModal('eventEdit');
+    const stop = async () => {
+      if (recogRef.current) try { recogRef.current.stop(); } catch (e) {}
+      setListening(false);
+    };
 
-      // 古いイベントを削除して新しいイベントを追加
-      removeEventFromCalendarData(eventId);
-      addEventToCalendarData(payload);
-      renderCalendar();
-      showSaveIndicator(true);
-
-      // バックグラウンドで保存
-      google.script.run
-        .withSuccessHandler(function(result) {
-          showSaveIndicator(false);
-          if (result.success) {
-            showToast(result.message || '予定を更新しました');
-          } else {
-            // 失敗：カレンダーを再読み込みして元に戻す
-            loadCalendarDataSafe();
-            showToast('エラー: ' + (result.error || '更新に失敗しました'));
-          }
-        })
-        .withFailureHandler(function(error) {
-          showSaveIndicator(false, true);
-          // 失敗：カレンダーを再読み込みして元に戻す
-          loadCalendarDataSafe();
-          console.error('updateEventData failed:', error);
-          showToast('更新に失敗しました');
-        })
-        .updateEventData(payload);
-    }
-
-    function deleteEditedEvent() {
-      const eventId = document.getElementById('editEventId').value;
-      const title = document.getElementById('editEventTitle').value;
-
-      if (!confirm(`予定「${title}」を削除しますか？`)) {
-        return;
-      }
-
-      // === Optimistic UI: 即座にカレンダーから削除 ===
-      hideModal('eventEdit');
-      removeEventFromCalendarData(eventId);
-      renderCalendar();
-      showSaveIndicator(true);
-
-      // バックグラウンドで削除
-      google.script.run
-        .withSuccessHandler(function(result) {
-          showSaveIndicator(false);
-          if (result.success) {
-            showToast(result.message || '予定を削除しました');
-          } else {
-            // 失敗：カレンダーを再読み込みして元に戻す
-            loadCalendarDataSafe();
-            showToast('エラー: ' + (result.error || '削除に失敗しました'));
-          }
-        })
-        .withFailureHandler(function(error) {
-          showSaveIndicator(false, true);
-          // 失敗：カレンダーを再読み込みして元に戻す
-          loadCalendarDataSafe();
-          console.error('deleteEventData failed:', error);
-          showToast('削除に失敗しました');
-        })
-        .deleteEventData(eventId);
-    }
-
-    function confirmCalendarEvent() {
-      // フォームから現在の値を取得
-      let startDate = document.getElementById('modalEventStartDate').value;
-      let endDate = document.getElementById('modalEventEndDate').value || startDate;
-
-      // end_dateがstart_dateより前なら入れ替え
-      if (endDate < startDate) {
-        const tmp = startDate;
-        startDate = endDate;
-        endDate = tmp;
-      }
-
-      // カテゴリはフォームから取得（手動入力対応）
-      const selectedColorKey = document.getElementById('modalEventColorKey').value;
-      const title = document.getElementById('modalEventTitle').value.trim();
-
-      const eventData = {
-        title: title,
-        start_date: startDate,
-        end_date: endDate,
-        start_time: document.getElementById('modalEventStartTime').value || null,
-        end_time: document.getElementById('modalEventEndTime').value || null,
-        memo: document.getElementById('modalEventMemo').value.trim() || null,
-        all_day: !document.getElementById('modalEventStartTime').value,
-        color_key: selectedColorKey || guessColorKeyFromTitle(title)
-      };
-
-      // タイトル必須チェック
-      if (!eventData.title) {
-        showToast('タイトルを入力してください');
-        return;
-      }
-
-      // 日付必須チェック
-      if (!eventData.start_date) {
-        showToast('日付を入力してください');
-        return;
-      }
-
-      hideModal('calendar');
-      document.getElementById('calendarTextInput').value = '';
-
-      // === Optimistic UI: 即座にカレンダーに反映 ===
-      const tempEventId = 'temp_' + Date.now();
-      const tempEvent = {
-        event_id: tempEventId,
-        title: eventData.title,
-        start_date: eventData.start_date,
-        end_date: eventData.end_date,
-        start_time: eventData.start_time,
-        end_time: eventData.end_time,
-        all_day: eventData.all_day,
-        memo: eventData.memo,
-        color_key: eventData.color_key
-      };
-
-      // カレンダーに仮追加
-      addEventToCalendarData(tempEvent);
-      renderCalendar();
-      showSaveIndicator(true);
-
-      // バックグラウンドで保存
-      google.script.run
-        .withSuccessHandler(function(result) {
-          showSaveIndicator(false);
-          if (result.success) {
-            // 成功：仮イベントを実際のイベントに置換（IDを更新）
-            if (result.event_id) {
-              replaceEventId(tempEventId, result.event_id);
-            }
-            showToast(result.message);
-          } else {
-            // 失敗：仮イベントを削除
-            removeEventFromCalendarData(tempEventId);
-            renderCalendar();
-            showToast('エラー: ' + result.error);
-          }
-        })
-        .withFailureHandler(function(error) {
-          showSaveIndicator(false, true);
-          // 失敗：仮イベントを削除
-          removeEventFromCalendarData(tempEventId);
-          renderCalendar();
-          console.error(error);
-          showToast('保存に失敗しました');
-        })
-        .registerEventDirect(eventData, state.pendingEventRaw || '');
-    }
-
-    // === Optimistic UI ヘルパー関数 ===
-
-    // カレンダーデータにイベントを追加
-    function addEventToCalendarData(event) {
-      const dateStr = event.start_date;
-      if (!state.calendarData.events[dateStr]) {
-        state.calendarData.events[dateStr] = [];
-      }
-      state.calendarData.events[dateStr].push(event);
-
-      // 複数日にまたがる場合も追加
-      if (event.end_date && event.end_date !== event.start_date) {
-        let current = toLocalDate(event.start_date);
-        const end = toLocalDate(event.end_date);
-        current.setDate(current.getDate() + 1); // start_dateは既に追加済み
-
-        while (current <= end) {
-          const d = toDateString(current);
-          if (!state.calendarData.events[d]) {
-            state.calendarData.events[d] = [];
-          }
-          state.calendarData.events[d].push(event);
-          current.setDate(current.getDate() + 1);
-        }
-      }
-    }
-
-    // カレンダーデータからイベントを削除
-    function removeEventFromCalendarData(eventId) {
-      for (const dateStr in state.calendarData.events) {
-        state.calendarData.events[dateStr] = state.calendarData.events[dateStr].filter(
-          evt => evt.event_id !== eventId
-        );
-        // 空配列を削除
-        if (state.calendarData.events[dateStr].length === 0) {
-          delete state.calendarData.events[dateStr];
-        }
-      }
-    }
-
-    // イベントIDを置換（仮ID → 実ID）
-    function replaceEventId(oldId, newId) {
-      for (const dateStr in state.calendarData.events) {
-        state.calendarData.events[dateStr].forEach(evt => {
-          if (evt.event_id === oldId) {
-            evt.event_id = newId;
-          }
-        });
-      }
-    }
-
-    function confirmMemoAppend() {
-      hideModal('memo');
-      showLoading(true);
-
-      google.script.run
-        .withSuccessHandler(function(result) {
-          showLoading(false);
-          if (result.success) {
-            showToast(result.message);
-            document.getElementById('memoTextInput').value = '';
-            document.getElementById('memoText').value = result.fullText;
-          } else {
-            showToast('エラー: ' + result.error);
-          }
-        })
-        .withFailureHandler(handleError)
-        .addMemo(state.memoDate, state.pendingMemoRaw, 'text');
-    }
-
-    // ===== 音声入力（continuous mode） =====
-    let recognition = null;
-    let isRecording = false;
-    let currentRecordingType = null;
-    let finalTextBuffer = '';  // 確定テキストを蓄積
-    let __speechRetry = 0;
-    const MAX_SPEECH_RETRY = 3;
-
-    function toggleVoiceInput(type) {
-      if (isRecording && currentRecordingType === type) {
-        // 録音中なら停止
-        stopVoiceInput(type);
-      } else {
-        // 録音開始
-        startVoiceInput(type);
-      }
-    }
-
-    function startVoiceInput(type) {
-      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        showToast('お使いのブラウザは音声入力に対応していません');
-        return;
-      }
-
-      // 既に録音中なら停止
-      if (recognition) {
-        recognition.abort();
-      }
-
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition = new SpeechRecognition();
-      recognition.lang = 'ja-JP';
-      recognition.continuous = true;        // 停止まで継続
-      recognition.interimResults = true;    // 途中結果も取得
-
-      const micBtn = document.getElementById(type + 'MicBtn');
-      const statusEl = document.getElementById(type + 'VoiceStatus');
-      // 音声入力は直接TextInputに流し込む
-      const inputEl = document.getElementById(type + 'TextInput');
-
-      // 状態リセット
-      finalTextBuffer = '';
-      inputEl.value = '';  // テキストエリアもクリア
-      isRecording = true;
-      currentRecordingType = type;
-      __speechRetry = 0; // 開始時にリトライカウントリセット
-
-      micBtn.classList.add('recording');
-      micBtn.textContent = '⏹';
-      statusEl.textContent = '🎤 録音中...タップで停止';
-
-      recognition.onresult = function(event) {
-        let interimTranscript = '';
-        let finalTranscript = '';
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript;
-          } else {
-            interimTranscript += transcript;
-          }
-        }
-
-        // 確定テキストをバッファに追加
-        if (finalTranscript) {
-          finalTextBuffer += finalTranscript;
-        }
-
-        // 入力欄に表示（確定 + 途中）
-        inputEl.value = finalTextBuffer + interimTranscript;
-        statusEl.textContent = '🎤 ' + (finalTextBuffer + interimTranscript).slice(-30);
-      };
-
-      recognition.onerror = function(event) {
-        console.error('Voice error:', event.error);
-        __speechRetry++;
-
-        // 無限ループ防止：最大リトライ回数で停止
-        if (__speechRetry >= MAX_SPEECH_RETRY) {
-          if (event.error !== 'aborted' && event.error !== 'no-speech') {
-            showToast('音声認識エラー: ' + event.error);
-          }
-          resetVoiceUI(type);
-          return;
-        }
-
-        // aborted/no-speech以外のエラーは通知
-        if (event.error !== 'aborted' && event.error !== 'no-speech') {
-          showToast('音声認識エラー: ' + event.error);
-          resetVoiceUI(type);
-        }
-      };
-
-      recognition.onend = function() {
-        // 録音中フラグがtrueでも、自動再開はしない（ループ防止）
-        // ユーザーが明示的に停止するか、エラーで終了したら終わり
-        if (isRecording && currentRecordingType === type) {
-          // 自動停止した場合は、ユーザーに通知して手動で再開させる
-          resetVoiceUI(type);
-          const inputEl = document.getElementById(type + 'TextInput');
-          if (inputEl.value.trim()) {
-            // テキストがあればAI処理を実行
-            if (type === 'calendar') {
-              handleCalendarInput();
-            } else if (type === 'memo') {
-              handleMemoInput();
-            }
-          }
-        }
-      };
-
+    const runParse = async () => {
+      const text = transcript.trim();
+      if (!text) { showToast('テキストを入力してください'); return; }
+      setBusy(true);
       try {
-        recognition.start();
-      } catch (e) {
-        showToast('音声入力の開始に失敗しました');
-        resetVoiceUI(type);
-      }
-    }
+        const res = await rpc('previewCalendarParse', text);
+        if (res && res.success) setParsed(res.eventData || res.data || res);
+        else showToast(res && res.error ? res.error : 'AI解析に失敗');
+      } catch (e) { showToast('AI解析エラー: ' + (e.message || e)); }
+      finally { setBusy(false); }
+    };
 
-    function stopVoiceInput(type) {
-      isRecording = false;
-      currentRecordingType = null;
+    const confirm = async () => {
+      if (!parsed) return;
+      setBusy(true);
+      try {
+        const payload = {
+          title: parsed.title || '予定',
+          start_date: parsed.start_date || defaultDate,
+          end_date: parsed.end_date || parsed.start_date || defaultDate,
+          start_time: parsed.start_time || null,
+          end_time: parsed.end_time || null,
+          all_day: !parsed.start_time,
+          memo: parsed.memo || '',
+          color_key: parsed.color_key || 'other',
+        };
+        const res = await rpc('registerEventDirect', payload, transcript);
+        if (res && res.success) {
+          showToast('予定を登録しました');
+          onAdded && onAdded();
+          onClose();
+        } else showToast(res && res.error ? res.error : '登録に失敗');
+      } catch (e) { showToast('登録エラー: ' + (e.message || e)); }
+      finally { setBusy(false); }
+    };
 
-      if (recognition) {
-        recognition.stop();
-        recognition = null;
-      }
+    if (!open) return null;
 
-      const micBtn = document.getElementById(type + 'MicBtn');
-      const statusEl = document.getElementById(type + 'VoiceStatus');
-      const inputEl = document.getElementById(type + 'TextInput');
+    return (
+      <div onClick={onClose} style={{
+        position: 'fixed', inset: 0, zIndex: 100,
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.35)',
+      }}>
+        <div onClick={e => e.stopPropagation()} style={{
+          width: '100%', maxWidth: 480, background: '#fafaf7',
+          borderTopLeftRadius: 24, borderTopRightRadius: 24,
+          padding: '14px 18px 28px',
+          maxHeight: '90vh', overflowY: 'auto',
+          animation: 'slideUp 240ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+        }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.15)', margin: '0 auto 12px' }}></div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1a1a' }}>予定を話す 🍀</div>
+            <button onClick={onClose} style={{ all: 'unset', cursor: 'pointer', color: '#888', fontSize: 14 }}>閉じる</button>
+          </div>
+          <div style={{ fontSize: 11.5, color: '#888', marginBottom: 14 }}>
+            例：「4月15日 プレゼン準備」「歯医者 4月3日 14時」
+          </div>
+          <textarea value={transcript} onChange={e => setTranscript(e.target.value)}
+            placeholder={listening ? '聞いています…' : 'マイクをタップして話す または ここに直接入力'}
+            rows={3}
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              padding: '12px 14px', borderRadius: 12,
+              border: '0.5px solid rgba(0,0,0,0.06)',
+              background: '#fff', fontSize: 15, color: '#1a1a1a',
+              fontFamily: 'inherit', resize: 'vertical', outline: 'none',
+              marginBottom: 12,
+            }}
+          />
+          {parsed && (
+            <div style={{
+              background: '#fff', borderRadius: 12, padding: '12px 14px',
+              border: `1px solid ${ACCENT}55`, marginBottom: 12,
+            }}>
+              <div style={{ fontSize: 14.5, fontWeight: 500, color: '#1a1a1a' }}>{parsed.title}</div>
+              <div style={{ fontSize: 11.5, color: '#888', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
+                {parsed.start_date}{parsed.end_date && parsed.end_date !== parsed.start_date ? ` 〜 ${parsed.end_date}` : ''}
+                {parsed.start_time ? ` ${parsed.start_time}` : ''}
+                {parsed.end_time ? ` 〜 ${parsed.end_time}` : ''}
+              </div>
+              {parsed.memo && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{parsed.memo}</div>}
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '6px 0 4px' }}>
+            <button onClick={listening ? stop : start} disabled={busy} style={{
+              all: 'unset', cursor: busy ? 'wait' : 'pointer',
+              width: 68, height: 68, borderRadius: 999,
+              background: listening ? '#c0392b' : '#1a1a1a',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: listening ? `0 0 0 8px ${ACCENT}33` : '0 6px 18px rgba(0,0,0,0.18)',
+              animation: listening ? 'pulse 1.2s ease-in-out infinite' : 'none',
+              opacity: busy ? 0.5 : 1,
+            }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                <rect x="9" y="3" width="6" height="12" rx="3" fill="#fff"/>
+                <path d="M5 11a7 7 0 0014 0M12 18v3" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+              </svg>
+            </button>
+            <button onClick={runParse} disabled={busy || !transcript.trim()} style={{
+              all: 'unset', cursor: busy ? 'wait' : 'pointer',
+              padding: '10px 18px', borderRadius: 999,
+              background: 'rgba(0,0,0,0.06)', color: '#1a1a1a',
+              fontSize: 13, fontWeight: 600,
+              opacity: (busy || !transcript.trim()) ? 0.4 : 1,
+            }}>{busy ? '解析中…' : 'AIで解析'}</button>
+          </div>
+          <div style={{ textAlign: 'center', marginTop: 8, fontSize: 11, color: '#999' }}>
+            {listening ? 'タップで停止' : (supported ? 'タップして話す' : 'テキストで入力 → AIで解析')}
+          </div>
+          {parsed && (
+            <button onClick={confirm} disabled={busy} style={{
+              all: 'unset', cursor: busy ? 'wait' : 'pointer', display: 'block', boxSizing: 'border-box',
+              width: '100%', textAlign: 'center', marginTop: 14,
+              padding: '13px 0', fontSize: 14.5, fontWeight: 600,
+              color: '#fff', background: '#1a1a1a', borderRadius: 12,
+              opacity: busy ? 0.5 : 1,
+            }}>{busy ? '登録中…' : 'カレンダーに追加'}</button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
-      micBtn.classList.remove('recording');
-      micBtn.textContent = '🎤';
+  function EventFormModal({ mode, eventId, defaultDate, onClose, onSaved }) {
+    const [loading, setLoading] = useState(mode === 'edit');
+    const [busy, setBusy] = useState(false);
+    const [form, setForm] = useState({
+      title: '', start_date: defaultDate || todayKey(), end_date: defaultDate || todayKey(),
+      start_time: '', end_time: '', all_day: true, color_key: 'other', memo: '',
+    });
 
-      // 自動でAI処理しない（ユーザーが編集→ボタン押下）
-      const text = inputEl.value.trim();
-      if (text) {
-        const buttonLabel = type === 'calendar' ? '登録' : '追記';
-        statusEl.textContent = '必要なら修正して「' + buttonLabel + '」を押してください';
-      } else {
-        statusEl.textContent = '';
-      }
-    }
-
-    function resetVoiceUI(type) {
-      isRecording = false;
-      currentRecordingType = null;
-      recognition = null;
-
-      const micBtn = document.getElementById(type + 'MicBtn');
-      const statusEl = document.getElementById(type + 'VoiceStatus');
-
-      micBtn.classList.remove('recording');
-      micBtn.textContent = '🎤';
-      statusEl.textContent = '';
-    }
-
-    // ===== ユーティリティ =====
-    function showLoading(show) {
-      document.getElementById('loading').classList.toggle('show', show);
-    }
-
-    // ミニローディング（AI処理中などに使用）
-    function showMiniLoading(show, text = 'AI処理中...') {
-      const el = document.getElementById('miniLoading');
-      const textEl = document.getElementById('miniLoadingText');
-      if (show) {
-        textEl.textContent = text;
-        el.classList.add('show');
-      } else {
-        el.classList.remove('show');
-      }
-    }
-
-    // 保存インジケータ
-    let saveIndicatorTimer = null;
-    function showSaveIndicator(show, isError = false) {
-      const el = document.getElementById('saveIndicator');
-      if (saveIndicatorTimer) clearTimeout(saveIndicatorTimer);
-
-      if (show) {
-        el.textContent = isError ? '保存失敗' : '保存中...';
-        el.classList.toggle('error', isError);
-        el.classList.add('show');
-        if (isError) {
-          saveIndicatorTimer = setTimeout(() => el.classList.remove('show'), 2000);
-        }
-      } else {
-        el.textContent = '保存完了';
-        saveIndicatorTimer = setTimeout(() => el.classList.remove('show'), 800);
-      }
-    }
-
-    function showToast(message) {
-      const toast = document.getElementById('toast');
-      toast.textContent = message;
-      toast.classList.add('show');
-      setTimeout(() => toast.classList.remove('show'), 2500);
-    }
-
-    // ===== 同期ステータス =====
-    let syncStatusTimer = null;
-    function showSyncStatus(kind, text) {
-      const el = document.getElementById('syncStatus');
-      const textEl = document.getElementById('syncStatusText');
-      if (syncStatusTimer) clearTimeout(syncStatusTimer);
-
-      // クラスをリセット
-      el.classList.remove('syncing', 'synced', 'error', 'offline');
-
-      if (kind === 'hide') {
-        el.classList.remove('show');
-        return;
-      }
-
-      el.classList.add(kind, 'show');
-      textEl.textContent = text || {
-        syncing: '同期中...',
-        synced: '同期完了',
-        error: '同期失敗',
-        offline: 'オフライン'
-      }[kind];
-
-      // synced と error は自動で消す
-      if (kind === 'synced') {
-        syncStatusTimer = setTimeout(() => el.classList.remove('show'), 1500);
-      } else if (kind === 'error') {
-        syncStatusTimer = setTimeout(() => el.classList.remove('show'), 3000);
-      }
-    }
-
-    // ===== 同期キュー基盤 =====
-    function enqueueSyncOp(operation) {
-      // operation: { type, payload, apply, revert, commit }
-      syncQueue.push(operation);
-      state.syncPending++;
-      updateSyncStatusFromQueue();
-
-      // 楽観的に適用
-      if (operation.apply) {
-        operation.apply();
-      }
-
-      // キュー処理を開始
-      processQueue();
-    }
-
-    async function processQueue() {
-      if (isSyncing || syncQueue.length === 0) return;
-      isSyncing = true;
-
-      while (syncQueue.length > 0) {
-        const op = syncQueue[0];
-        try {
-          await op.commit();
-          syncQueue.shift();
-          state.syncPending--;
-        } catch (e) {
-          console.error('Sync failed:', op.type, e);
-          // リバート
-          if (op.revert) {
-            op.revert();
+    useEffect(() => {
+      if (mode === 'edit' && eventId) {
+        rpc('getEventData', eventId).then(res => {
+          if (res && res.success && res.eventData) {
+            const e = res.eventData;
+            setForm({
+              title: e.title || '',
+              start_date: e.start_date || todayKey(),
+              end_date: e.end_date || e.start_date || todayKey(),
+              start_time: e.start_time || '',
+              end_time: e.end_time || '',
+              all_day: !e.start_time,
+              color_key: e.color_key || 'other',
+              memo: e.memo || '',
+            });
+          } else {
+            showToast('読み込みエラー');
+            onClose();
           }
-          syncQueue.shift();
-          state.syncPending--;
-          showSyncStatus('error', '同期失敗');
+        }).catch(err => {
+          showToast('読み込みエラー: ' + (err.message || err));
+          onClose();
+        }).finally(() => setLoading(false));
+      }
+    }, [mode, eventId]);
+
+    const update = (patch) => setForm(f => ({ ...f, ...patch }));
+
+    const save = async () => {
+      if (!form.title.trim()) { showToast('タイトルを入力してください'); return; }
+      setBusy(true);
+      try {
+        const payload = {
+          title: form.title.trim(),
+          start_date: form.start_date,
+          end_date: form.end_date || form.start_date,
+          start_time: form.all_day ? null : (form.start_time || null),
+          end_time: form.all_day ? null : (form.end_time || null),
+          all_day: !!form.all_day,
+          memo: form.memo,
+          color_key: form.color_key,
+        };
+        if (mode === 'edit') {
+          payload.event_id = eventId;
+          const res = await rpc('updateEventData', payload);
+          if (res && res.success) { showToast('更新しました'); onSaved && onSaved(); onClose(); }
+          else showToast(res && res.error ? res.error : '更新失敗');
+        } else {
+          const res = await rpc('registerEventDirect', payload, '');
+          if (res && res.success) { showToast('登録しました'); onSaved && onSaved(); onClose(); }
+          else showToast(res && res.error ? res.error : '登録失敗');
         }
+      } catch (e) { showToast('エラー: ' + (e.message || e)); }
+      finally { setBusy(false); }
+    };
+
+    const remove = async () => {
+      if (!confirm('この予定を削除しますか？')) return;
+      setBusy(true);
+      try {
+        const res = await rpc('deleteEventData', eventId);
+        if (res && res.success) { showToast('削除しました'); onSaved && onSaved(); onClose(); }
+        else showToast(res && res.error ? res.error : '削除失敗');
+      } catch (e) { showToast('エラー: ' + (e.message || e)); }
+      finally { setBusy(false); }
+    };
+
+    const inputStyle = {
+      width: '100%', boxSizing: 'border-box', padding: '10px 12px',
+      borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.1)',
+      background: '#fff', fontSize: 14, color: '#1a1a1a',
+      fontFamily: 'inherit', outline: 'none',
+    };
+    const labelStyle = { fontSize: 11, fontWeight: 600, color: '#888', letterSpacing: 0.6, marginBottom: 4, display: 'block' };
+
+    return (
+      <div onClick={onClose} style={{
+        position: 'fixed', inset: 0, zIndex: 110,
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.4)',
+      }}>
+        <div onClick={e => e.stopPropagation()} style={{
+          width: '100%', maxWidth: 480, background: '#fafaf7',
+          borderTopLeftRadius: 24, borderTopRightRadius: 24,
+          padding: '14px 18px 28px',
+          maxHeight: '90vh', overflowY: 'auto',
+          animation: 'slideUp 240ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+        }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.15)', margin: '0 auto 12px' }}></div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>{mode === 'edit' ? '予定を編集' : '予定を追加'}</div>
+            <button onClick={onClose} style={{ all: 'unset', cursor: 'pointer', color: '#888', fontSize: 14 }}>閉じる</button>
+          </div>
+          {loading ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>読み込み中…</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>タイトル</label>
+                <input value={form.title} onChange={e => update({ title: e.target.value })} style={inputStyle} />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>開始日</label>
+                  <input type="date" value={form.start_date} onChange={e => update({ start_date: e.target.value })} style={inputStyle} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>終了日</label>
+                  <input type="date" value={form.end_date} onChange={e => update({ end_date: e.target.value })} style={inputStyle} />
+                </div>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#444', cursor: 'pointer' }}>
+                <input type="checkbox" checked={form.all_day} onChange={e => update({ all_day: e.target.checked })} />
+                終日
+              </label>
+              {!form.all_day && (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={labelStyle}>開始時刻</label>
+                    <input type="time" value={form.start_time} onChange={e => update({ start_time: e.target.value })} style={inputStyle} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={labelStyle}>終了時刻</label>
+                    <input type="time" value={form.end_time} onChange={e => update({ end_time: e.target.value })} style={inputStyle} />
+                  </div>
+                </div>
+              )}
+              <div>
+                <label style={labelStyle}>カテゴリ</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                  {COLOR_KEY_OPTIONS.map(o => {
+                    const active = o.key === form.color_key;
+                    return (
+                      <button key={o.key} onClick={() => update({ color_key: o.key })} style={{
+                        all: 'unset', cursor: 'pointer', textAlign: 'center',
+                        padding: '8px 4px', fontSize: 11.5, fontWeight: 600,
+                        color: active ? '#fff' : '#444',
+                        background: active ? o.color : 'rgba(0,0,0,0.04)',
+                        borderRadius: 8,
+                        borderLeft: `3px solid ${o.color}`,
+                      }}>{o.label}</button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <label style={labelStyle}>メモ</label>
+                <textarea value={form.memo} onChange={e => update({ memo: e.target.value })} rows={2}
+                  style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                {mode === 'edit' && (
+                  <button onClick={remove} disabled={busy} style={{
+                    all: 'unset', cursor: busy ? 'wait' : 'pointer',
+                    padding: '12px 0', borderRadius: 10,
+                    background: 'rgba(192,57,43,0.08)', color: '#c0392b',
+                    fontSize: 13, fontWeight: 600, textAlign: 'center',
+                    width: 100, opacity: busy ? 0.5 : 1,
+                  }}>削除</button>
+                )}
+                <button onClick={save} disabled={busy} style={{
+                  all: 'unset', cursor: busy ? 'wait' : 'pointer',
+                  flex: 1, padding: '12px 0', borderRadius: 10,
+                  background: '#1a1a1a', color: '#fff',
+                  fontSize: 14, fontWeight: 600, textAlign: 'center',
+                  opacity: busy ? 0.5 : 1,
+                }}>{busy ? '処理中…' : (mode === 'edit' ? '保存' : '登録')}</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function NoteVoiceModal({ open, onClose, note, onApplied }) {
+    const [listening, setListening] = useState(false);
+    const [transcript, setTranscript] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [preview, setPreview] = useState(null);
+    const recogRef = useRef(null);
+    const supported = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+    useEffect(() => {
+      if (!open) {
+        setListening(false); setTranscript(''); setPreview(null); setBusy(false);
+        if (recogRef.current) try { recogRef.current.stop(); } catch (e) {}
       }
+    }, [open]);
 
-      isSyncing = false;
-      updateSyncStatusFromQueue();
-    }
-
-    function updateSyncStatusFromQueue() {
-      if (state.syncPending > 0) {
-        showSyncStatus('syncing', `同期中 (${state.syncPending})`);
-      } else if (syncQueue.length === 0) {
-        showSyncStatus('synced');
-      }
-    }
-
-    // ===== キャッシュユーティリティ =====
-    const CACHE_TTL = 5 * 60 * 1000; // 5分
-
-    function getCacheKey(year, month) {
-      return `${year}-${String(month).padStart(2, '0')}`;
-    }
-
-    function getCalendarCache(year, month) {
-      const key = getCacheKey(year, month);
-      const cached = state.cache.calendar[key];
-      if (!cached) return null;
-      // TTLチェック
-      if (Date.now() - cached.cachedAt > CACHE_TTL) {
-        delete state.cache.calendar[key];
-        return null;
-      }
-      return cached;
-    }
-
-    function setCalendarCache(year, month, data) {
-      const key = getCacheKey(year, month);
-      state.cache.calendar[key] = {
-        ...data,
-        cachedAt: Date.now()
+    const start = () => {
+      if (!supported) { showToast('音声認識非対応'); return; }
+      setTranscript(''); setPreview(null);
+      const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const r = new Rec();
+      r.lang = 'ja-JP'; r.interimResults = true; r.continuous = true;
+      let finalText = '';
+      r.onresult = (e) => {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+          else interim += e.results[i][0].transcript;
+        }
+        setTranscript((finalText + interim).trim());
       };
-    }
+      r.onerror = () => setListening(false);
+      r.onend = () => setListening(false);
+      recogRef.current = r;
+      r.start();
+      setListening(true);
+    };
+    const stop = () => {
+      if (recogRef.current) try { recogRef.current.stop(); } catch (e) {}
+      setListening(false);
+    };
 
-    function invalidateCalendarCache(year, month) {
-      const key = getCacheKey(year, month);
-      delete state.cache.calendar[key];
-    }
+    const runAI = async () => {
+      if (!note) return;
+      const text = transcript.trim();
+      if (!text) { showToast('テキストを入力してください'); return; }
+      setBusy(true);
+      try {
+        const res = await rpc('processNoteAIData', text, note.note_id, note.tab_name);
+        if (res && res.success) setPreview(res);
+        else showToast(res && res.error ? res.error : 'AI整理に失敗');
+      } catch (e) { showToast('AIエラー: ' + (e.message || e)); }
+      finally { setBusy(false); }
+    };
 
-    function handleError(error) {
-      showLoading(false);
-      showMiniLoading(false);
-      console.error(error);
-      showToast('エラーが発生しました');
-    }
+    const apply = async (mode) => {
+      if (!note || !preview) return;
+      setBusy(true);
+      try {
+        const newText = mode === 'replace'
+          ? preview.structuredText
+          : (note.note_text ? note.note_text + '\n\n' + preview.structuredText : preview.structuredText);
+        await rpc('saveNoteData', note.note_id, newText);
+        const updated = { note_text: newText };
+        if (preview.autoTitle && preview.title) {
+          await rpc('saveNoteNameData', note.note_id, preview.title);
+          updated.tab_name = preview.title;
+        }
+        onApplied && onApplied(updated);
+        showToast(mode === 'replace' ? '上書きしました' : '追記しました');
+        onClose();
+      } catch (e) { showToast('保存失敗: ' + (e.message || e)); }
+      finally { setBusy(false); }
+    };
 
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
+    if (!open) return null;
+    return (
+      <div onClick={onClose} style={{
+        position: 'fixed', inset: 0, zIndex: 100,
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.35)',
+      }}>
+        <div onClick={e => e.stopPropagation()} style={{
+          width: '100%', maxWidth: 480, background: '#fafaf7',
+          borderTopLeftRadius: 24, borderTopRightRadius: 24,
+          padding: '14px 18px 28px',
+          maxHeight: '90vh', overflowY: 'auto',
+          animation: 'slideUp 240ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+        }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.15)', margin: '0 auto 12px' }}></div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1a1a' }}>音声で整理 ✨</div>
+            <button onClick={onClose} style={{ all: 'unset', cursor: 'pointer', color: '#888', fontSize: 14 }}>閉じる</button>
+          </div>
+          <div style={{ fontSize: 11.5, color: '#888', marginBottom: 14 }}>
+            話した内容をAIが校正・構造化・分類します。
+          </div>
+          <textarea value={transcript} onChange={e => setTranscript(e.target.value)}
+            placeholder={listening ? '聞いています…' : 'マイクをタップして話す または ここに直接入力'}
+            rows={3}
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              padding: '12px 14px', borderRadius: 12,
+              border: '0.5px solid rgba(0,0,0,0.06)',
+              background: '#fff', fontSize: 15, color: '#1a1a1a',
+              fontFamily: 'inherit', resize: 'vertical', outline: 'none',
+              marginBottom: 12,
+            }}
+          />
+          {preview && (
+            <div style={{
+              background: '#fff', borderRadius: 12, padding: '12px 14px',
+              border: `1px solid ${ACCENT}55`, marginBottom: 12,
+            }}>
+              {preview.title && <div style={{ fontSize: 11.5, color: ACCENT, fontWeight: 600, marginBottom: 6 }}>提案タイトル：{preview.title}</div>}
+              <div style={{ fontSize: 13.5, color: '#1a1a1a', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{preview.structuredText}</div>
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '6px 0 4px' }}>
+            <button onClick={listening ? stop : start} disabled={busy} style={{
+              all: 'unset', cursor: busy ? 'wait' : 'pointer',
+              width: 68, height: 68, borderRadius: 999,
+              background: listening ? '#c0392b' : '#1a1a1a',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: listening ? `0 0 0 8px ${ACCENT}33` : '0 6px 18px rgba(0,0,0,0.18)',
+              animation: listening ? 'pulse 1.2s ease-in-out infinite' : 'none',
+              opacity: busy ? 0.5 : 1,
+            }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                <rect x="9" y="3" width="6" height="12" rx="3" fill="#fff"/>
+                <path d="M5 11a7 7 0 0014 0M12 18v3" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+              </svg>
+            </button>
+            <button onClick={runAI} disabled={busy || !transcript.trim()} style={{
+              all: 'unset', cursor: busy ? 'wait' : 'pointer',
+              padding: '10px 18px', borderRadius: 999,
+              background: 'rgba(0,0,0,0.06)', color: '#1a1a1a',
+              fontSize: 13, fontWeight: 600,
+              opacity: (busy || !transcript.trim()) ? 0.4 : 1,
+            }}>{busy ? 'AI処理中…' : 'AIで整理'}</button>
+          </div>
+          {preview && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+              <button onClick={() => apply('append')} disabled={busy} style={{
+                all: 'unset', cursor: busy ? 'wait' : 'pointer', flex: 1,
+                padding: '12px 0', borderRadius: 10, textAlign: 'center',
+                background: 'rgba(0,0,0,0.06)', color: '#1a1a1a',
+                fontSize: 13, fontWeight: 600,
+              }}>末尾に追記</button>
+              <button onClick={() => apply('replace')} disabled={busy} style={{
+                all: 'unset', cursor: busy ? 'wait' : 'pointer', flex: 1,
+                padding: '12px 0', borderRadius: 10, textAlign: 'center',
+                background: '#1a1a1a', color: '#fff',
+                fontSize: 13, fontWeight: 600,
+              }}>上書き</button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function NotesView() {
+    const [notes, setNotes] = useState([]);
+    const [activeId, setActiveId] = useState(1);
+    const [editingName, setEditingName] = useState(false);
+    const [tempName, setTempName] = useState('');
+    const [voiceOpen, setVoiceOpen] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const saveTimerRef = useRef(null);
+    const lastSentRef = useRef('');
+
+    useEffect(() => {
+      rpc('getNotesData').then(res => {
+        if (res && res.success) setNotes(res.notes || []);
+        else showToast(res && res.error ? res.error : 'ノート読み込み失敗');
+        setLoading(false);
+      }).catch(err => {
+        showToast('ノート読み込みエラー: ' + (err.message || err));
+        setLoading(false);
+      });
+    }, []);
+
+    const active = notes.find(n => n.note_id === activeId);
+
+    const updateNoteLocal = (noteId, patch) => {
+      setNotes(ns => ns.map(n => n.note_id === noteId ? { ...n, ...patch } : n));
+    };
+
+    const onTextChange = (text) => {
+      if (!active) return;
+      updateNoteLocal(active.note_id, { note_text: text });
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        if (text === lastSentRef.current) return;
+        lastSentRef.current = text;
+        rpc('saveNoteData', active.note_id, text)
+          .then(res => {
+            if (res && res.success) showSync('success', '保存しました');
+            else showSync('error', '保存失敗');
+          })
+          .catch(() => showSync('error', '保存失敗'));
+      }, 1500);
+    };
+
+    const startEditName = () => {
+      if (!active) return;
+      setTempName(active.tab_name);
+      setEditingName(true);
+    };
+    const commitName = async () => {
+      if (!active) return;
+      const newName = tempName.trim() || active.tab_name;
+      setEditingName(false);
+      if (newName === active.tab_name) return;
+      updateNoteLocal(active.note_id, { tab_name: newName });
+      try {
+        const res = await rpc('saveNoteNameData', active.note_id, newName);
+        if (res && res.success) showSync('success', 'タブ名を更新');
+      } catch (e) { showToast('タブ名更新エラー'); }
+    };
+
+    const onClear = async () => {
+      if (!active) return;
+      if (!confirm(`「${active.tab_name}」のテキストをクリアしますか？\nタブ名はデフォルトに戻ります。`)) return;
+      try {
+        const res = await rpc('clearNoteData', active.note_id);
+        if (res && res.success) {
+          updateNoteLocal(active.note_id, { note_text: '', tab_name: res.defaultName || `メモ${active.note_id}` });
+          showToast('クリアしました');
+        } else showToast('クリア失敗');
+      } catch (e) { showToast('エラー: ' + (e.message || e)); }
+    };
+
+    if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>読み込み中…</div>;
+
+    return (
+      <div style={{ padding: '0 0 60px', position: 'relative' }}>
+        <div style={{
+          display: 'flex', overflowX: 'auto', padding: '4px 14px 10px',
+          gap: 6, WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+        }} className="notes-tabbar">
+          <style>{`.notes-tabbar::-webkit-scrollbar { display: none; }`}</style>
+          {notes.map(n => {
+            const a = n.note_id === activeId;
+            return (
+              <button key={n.note_id} onClick={() => { setActiveId(n.note_id); setEditingName(false); }} style={{
+                all: 'unset', cursor: 'pointer',
+                padding: '7px 12px', borderRadius: 999,
+                fontSize: 12.5, fontWeight: 600,
+                background: a ? '#1a1a1a' : 'rgba(0,0,0,0.04)',
+                color: a ? '#fff' : '#666',
+                whiteSpace: 'nowrap', flexShrink: 0,
+              }}>{n.tab_name || `メモ${n.note_id}`}</button>
+            );
+          })}
+        </div>
+
+        <div style={{ padding: '10px 18px 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          {editingName ? (
+            <input value={tempName} autoFocus
+              onChange={e => setTempName(e.target.value)}
+              onBlur={commitName}
+              onKeyDown={e => { if (e.key === 'Enter') commitName(); if (e.key === 'Escape') setEditingName(false); }}
+              style={{
+                flex: 1, padding: '6px 10px', borderRadius: 8,
+                border: '0.5px solid rgba(0,0,0,0.15)',
+                fontSize: 16, fontWeight: 600, fontFamily: 'inherit', outline: 'none',
+                background: '#fff',
+              }}
+            />
+          ) : (
+            <button onClick={startEditName} style={{
+              all: 'unset', cursor: 'pointer',
+              fontSize: 16, fontWeight: 600, color: '#1a1a1a',
+              flex: 1, minWidth: 0,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>{active ? active.tab_name : ''} <span style={{ fontSize: 11, color: '#aaa', fontWeight: 400 }}>✎</span></button>
+          )}
+          <button onClick={onClear} title="クリア" style={{
+            all: 'unset', cursor: 'pointer',
+            padding: '6px 10px', borderRadius: 8,
+            background: 'rgba(192,57,43,0.07)', color: '#c0392b',
+            fontSize: 11.5, fontWeight: 600,
+          }}>クリア</button>
+        </div>
+
+        <div style={{ padding: '0 14px' }}>
+          <textarea
+            value={active ? active.note_text : ''}
+            onChange={e => onTextChange(e.target.value)}
+            placeholder="メモを書く…（自動保存）"
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              padding: '14px 16px', borderRadius: 14,
+              border: '0.5px solid rgba(0,0,0,0.05)',
+              background: '#fff', fontSize: 15, color: '#1a1a1a',
+              fontFamily: 'inherit', lineHeight: 1.6, resize: 'vertical',
+              outline: 'none',
+              minHeight: 280,
+            }}
+          />
+        </div>
+
+        <button onClick={() => setVoiceOpen(true)} aria-label="AIで整理" style={{
+          all: 'unset', cursor: 'pointer',
+          position: 'fixed', right: 18, bottom: 44, zIndex: 50,
+          width: 56, height: 56, borderRadius: 999,
+          background: '#1a1a1a',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.22), 0 2px 4px rgba(0,0,0,0.12)',
+        }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <rect x="9" y="3" width="6" height="12" rx="3" fill="#fff"/>
+            <path d="M5 11a7 7 0 0014 0M12 18v3" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+          </svg>
+        </button>
+
+        <NoteVoiceModal
+          open={voiceOpen} onClose={() => setVoiceOpen(false)}
+          note={active}
+          onApplied={(updated) => {
+            updateNoteLocal(active.note_id, updated);
+          }}
+        />
+      </div>
+    );
+  }
+
+  function ViewSwitch({ value, onChange }) {
+    const opts = [
+      { id: 'calendar', label: 'カレンダー' },
+      { id: 'notes', label: 'メモ' },
+    ];
+    return (
+      <div style={{
+        margin: '0 14px 8px',
+        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0,
+        background: '#f1efe9', borderRadius: 10, padding: 3,
+      }}>
+        {opts.map(o => {
+          const active = o.id === value;
+          return (
+            <button key={o.id} onClick={() => onChange(o.id)} style={{
+              all: 'unset', cursor: 'pointer', textAlign: 'center',
+              padding: '7px 0', fontSize: 13, fontWeight: 600,
+              color: active ? '#1a1a1a' : '#888',
+              background: active ? '#fff' : 'transparent',
+              borderRadius: 8,
+              boxShadow: active ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+              transition: 'all 160ms ease',
+            }}>{o.label}</button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function App() {
+    const [today, setToday] = useState(todayKey());
+    const [year, setYear] = useState(new Date().getFullYear());
+    const [month, setMonth] = useState(new Date().getMonth() + 1);
+    const [selectedDate, setSelectedDate] = useState(todayKey());
+    const [calendarData, setCalendarData] = useState({ events: {}, holidays: {}, rokuyo: {} });
+    const [view, setView] = useState('calendar');
+    const [voiceOpen, setVoiceOpen] = useState(false);
+    const [eventModal, setEventModal] = useState(null);
+    const [calLoading, setCalLoading] = useState(false);
+
+    const splashHide = () => {
+      const el = document.getElementById('splash');
+      if (el) el.classList.add('hide');
+      setTimeout(() => { if (el) el.style.display = 'none'; }, 320);
+    };
+
+    const loadCalendar = useCallback(async (y, m) => {
+      setCalLoading(true);
+      try {
+        const res = await rpc('getCalendarData', y, m);
+        if (res && res.success) {
+          setCalendarData({
+            events: res.events || {},
+            holidays: res.holidays || {},
+            rokuyo: res.rokuyo || {},
+          });
+        } else {
+          showToast(res && res.error ? res.error : 'カレンダー取得失敗');
+        }
+      } catch (e) {
+        showToast('読込エラー: ' + (e.message || e));
+      } finally { setCalLoading(false); }
+    }, []);
+
+    useEffect(() => {
+      rpc('getInitialData').then(res => {
+        if (res && res.success) {
+          const t = res.today || todayKey();
+          const y = res.year || new Date().getFullYear();
+          const m = res.month || new Date().getMonth() + 1;
+          setToday(t); setYear(y); setMonth(m); setSelectedDate(t);
+          return loadCalendar(y, m);
+        } else {
+          return loadCalendar(year, month);
+        }
+      }).catch(err => {
+        showToast('初期化エラー: ' + (err.message || err));
+      }).finally(() => {
+        splashHide();
+      });
+    }, []);
+
+    const goPrev = () => {
+      let y = year, m = month - 1;
+      if (m < 1) { m = 12; y -= 1; }
+      setYear(y); setMonth(m);
+      loadCalendar(y, m);
+    };
+    const goNext = () => {
+      let y = year, m = month + 1;
+      if (m > 12) { m = 1; y += 1; }
+      setYear(y); setMonth(m);
+      loadCalendar(y, m);
+    };
+
+    const monthEventCount = useMemo(() => {
+      let count = 0;
+      const prefix = `${year}-${pad2(month)}`;
+      for (const k in calendarData.events) {
+        if (k.startsWith(prefix)) count += (calendarData.events[k] || []).length;
+      }
+      return count;
+    }, [calendarData.events, year, month]);
+
+    const dayEvents = calendarData.events[selectedDate] || [];
+    const refreshAfterChange = () => loadCalendar(year, month);
+
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#fafaf7' }}>
+        <div style={{
+          background: '#fafaf7',
+          borderBottom: '0.5px solid rgba(0,0,0,0.06)',
+          paddingTop: 18,
+        }}>
+          <div style={{ padding: '4px 18px 8px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: 10.5, color: '#888', letterSpacing: 1.6, fontWeight: 600 }}>🍀 {APP_NAME.toUpperCase()}</div>
+              <div style={{ fontSize: 21, fontWeight: 400, color: '#1a1a1a', marginTop: 1, letterSpacing: -0.4 }}>
+                {view === 'calendar' ? jpMonthLabel(year, month) : 'メモ'}
+              </div>
+            </div>
+            {view === 'calendar' && (
+              <div style={{ fontSize: 10.5, color: '#aaa', fontVariantNumeric: 'tabular-nums' }}>
+                {calLoading ? '読込中…' : `${monthEventCount}件の予定`}
+              </div>
+            )}
+          </div>
+          <ViewSwitch value={view} onChange={setView} />
+        </div>
+
+        <div style={{ flex: 1, position: 'relative' }}>
+          {view === 'calendar' ? (
+            <React.Fragment>
+              <CalendarScreen
+                year={year} month={month}
+                evMap={calendarData.events}
+                holidays={calendarData.holidays}
+                rokuyo={calendarData.rokuyo}
+                onPrev={goPrev} onNext={goNext}
+                onSelectDate={setSelectedDate}
+                selectedDate={selectedDate}
+                todayK={today}
+              />
+              <DayDetailPanel
+                dateKey={selectedDate}
+                events={dayEvents}
+                holidays={calendarData.holidays}
+                onEditEvent={(id) => setEventModal({ mode: 'edit', eventId: id })}
+                onCreateEvent={(d) => setEventModal({ mode: 'create', defaultDate: d })}
+              />
+            </React.Fragment>
+          ) : (
+            <NotesView />
+          )}
+          <div style={{ height: 60 }} />
+        </div>
+
+        {view === 'calendar' && (
+          <button onClick={() => setVoiceOpen(true)} aria-label="予定を音声で追加" style={{
+            all: 'unset', cursor: 'pointer',
+            position: 'fixed', right: 18, bottom: 44, zIndex: 50,
+            width: 56, height: 56, borderRadius: 999,
+            background: '#1a1a1a',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.22), 0 2px 4px rgba(0,0,0,0.12)',
+          }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <rect x="9" y="3" width="6" height="12" rx="3" fill="#fff"/>
+              <path d="M5 11a7 7 0 0014 0M12 18v3" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+            </svg>
+          </button>
+        )}
+
+        <CalendarVoiceModal
+          open={voiceOpen} onClose={() => setVoiceOpen(false)}
+          defaultDate={selectedDate}
+          onAdded={refreshAfterChange}
+        />
+        {eventModal && (
+          <EventFormModal
+            mode={eventModal.mode}
+            eventId={eventModal.eventId}
+            defaultDate={eventModal.defaultDate || selectedDate}
+            onClose={() => setEventModal(null)}
+            onSaved={refreshAfterChange}
+          />
+        )}
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
   </script>
 </body>
 </html>

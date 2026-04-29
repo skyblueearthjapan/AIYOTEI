@@ -485,3 +485,112 @@ function previewMemoCleaning(text) {
     };
   }
 }
+
+// ===========================================
+// ノート用API関数（DB_Notes 固定10タブ）
+// ===========================================
+
+/**
+ * 全ノートを取得（Webアプリから呼び出し）
+ * 初回はデフォルト10個を自動生成
+ * @returns {Object}
+ */
+function getNotesData() {
+  try {
+    initializeNotes();
+    const notes = getAllNotes();
+    return {
+      success: true,
+      notes: notes
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * ノートのテキストを保存
+ * @param {number} noteId - ノートID (1-10)
+ * @param {string} text - 保存するテキスト
+ * @returns {Object}
+ */
+function saveNoteData(noteId, text) {
+  try {
+    saveNoteText(noteId, text);
+    return {
+      success: true,
+      message: 'ノートを保存しました'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * ノートのタブ名を変更
+ * @param {number} noteId - ノートID (1-10)
+ * @param {string} newName - 新しいタブ名
+ * @returns {Object}
+ */
+function saveNoteNameData(noteId, newName) {
+  try {
+    saveNoteName(noteId, newName);
+    return {
+      success: true,
+      message: 'タブ名を変更しました'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * ノートを削除（テキストクリア＋タブ名リセット）
+ * @param {number} noteId - ノートID (1-10)
+ * @returns {Object}
+ */
+function clearNoteData(noteId) {
+  try {
+    clearNote(noteId);
+    var defaultNames = getDefaultNoteNames();
+    var defaultName = defaultNames[noteId - 1] || ('メモ' + noteId);
+    return {
+      success: true,
+      defaultName: defaultName,
+      message: 'ノートを削除しました'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * ノート用3段階AI処理
+ * @param {string} rawText - 音声/テキスト入力の生テキスト
+ * @param {number} noteId - ノートID
+ * @param {string} currentTabName - 現在のタブ名
+ * @returns {Object}
+ */
+function processNoteAIData(rawText, noteId, currentTabName) {
+  try {
+    var result = processNoteAI(rawText, currentTabName, noteId);
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
