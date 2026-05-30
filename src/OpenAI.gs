@@ -166,7 +166,11 @@ titleの例：
 2. 単日予定は start_date = end_date
 3. 期間予定（「◯日から◯日まで」等）は end_date を適切に設定
 4. 終日予定の場合は all_day: true
-5. 今日の日付は {{TODAY}} として参照可能
+5. 【年の決定（最重要）】今日は {{TODAY}}（YYYY-MM-DD形式）。
+   - ユーザーが西暦・年を明示していない場合は、必ず「今日以降で最も近い日付」を選ぶこと。過去の年（昨年・一昨年など）には絶対にしない。
+   - 例: 今日が 2026-05-30 で入力が「6月2日」なら start_date は 2026-06-02。2024-06-02 や 2025-06-02 にしてはいけない。
+   - 「来年」「再来年」など年を示す語がある場合のみ、その年にする。
+   - 出力する start_date / end_date の年は、必ず {{TODAY}} の年以上にすること。
 6. color_keyは内容から最も適切なカテゴリを1つ選ぶ
 
 ## 出力前の自己チェック（必須）
@@ -302,6 +306,10 @@ function validateCalendarData(data, rawText) {
     data.end_date = data.start_date;
   }
 
+  // 年の保険補正：AIが年を誤解釈して過去日になった場合、今日以降の最も近い年に補正する
+  // （MyCalendarは未来の予定を入力する用途のため、過去日は年の取り違えとみなす）
+  correctEventYearIfPast(data);
+
   // 時間のフォーマット検証
   if (data.start_time && !/^\d{2}:\d{2}$/.test(data.start_time)) {
     data.start_time = null;
@@ -319,6 +327,41 @@ function validateCalendarData(data, rawText) {
   const validColorKeys = ['health', 'work', 'family', 'finance', 'travel', 'fun', 'school', 'other'];
   if (!data.color_key || !validColorKeys.includes(data.color_key)) {
     data.color_key = 'other';
+  }
+}
+
+/**
+ * 年の取り違え保険：start_dateが今日より過去なら、同じ月日で今日以降の最も近い年に補正する。
+ * end_dateにも同じ年差を適用して期間（連泊など）を保つ。
+ * AIが年なし入力（「6月2日」等）を過去年に解釈する誤りへの安全網。
+ * @param {Object} data - start_date / end_date を持つ解析データ
+ */
+function correctEventYearIfPast(data) {
+  const pad2 = (n) => String(n).padStart(2, '0');
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data.start_date)) return;
+
+  const today = getTodayDate(); // YYYY-MM-DD（Asia/Tokyo）
+  if (data.start_date >= today) return; // 過去でなければ補正不要
+
+  const todayYear = parseInt(today.slice(0, 4), 10);
+  const [sy, sm, sd] = data.start_date.split('-').map(Number);
+
+  // start_dateの月日を、今日以降になる最小の年に割り当てる
+  let newYear = todayYear;
+  if (`${newYear}-${pad2(sm)}-${pad2(sd)}` < today) {
+    newYear = todayYear + 1;
+  }
+
+  const yearDelta = newYear - sy;
+  if (yearDelta <= 0) return;
+
+  console.warn(`[correctEventYearIfPast] 過去日を補正: ${data.start_date} -> 年+${yearDelta}`);
+  data.start_date = `${sy + yearDelta}-${pad2(sm)}-${pad2(sd)}`;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(data.end_date)) {
+    const [ey, em, ed] = data.end_date.split('-').map(Number);
+    data.end_date = `${ey + yearDelta}-${pad2(em)}-${pad2(ed)}`;
   }
 }
 
